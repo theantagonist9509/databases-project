@@ -10,9 +10,10 @@ create table Routes(    rid int primary key,
                         arrival datetime,
                         foreign key (tid) references Trains(tid));
 
-create table SeatsUsed( rid int primary key,
+create table SeatsUsed( rid int,
                         first_class int,
-                        second_class int);
+                        second_class int,
+                        foreign key (rid) references Routes(rid));
 
 create table Customers( cid int primary key,
                         name varchar(40),

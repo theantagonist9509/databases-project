@@ -1,0 +1,2 @@
+All table names in PascalCase
+All column tables in snake case but obvio they are not case sensitive so yeah

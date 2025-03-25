@@ -1,0 +1,34 @@
+create table Trains(    tid int primary key,
+                        first_class int,
+                        second_class int);
+
+create table Routes(    rid int primary key,
+                        tid int,
+                        origin varchar(40),
+                        dest varchar(40),
+                        departure datetime ,
+                        arrival datetime,
+                        foreign key (tid) references Trains(tid));
+
+create table SeatsUsed( rid int primary key,
+                        first_class int,
+                        second_class int);
+
+create table Customers( cid int primary key,
+                        name varchar(40),
+                        consetion_class varchar(40),
+                        age int );
+
+create table Bookings(  PNR int primary key,
+                        cid int,
+                        rid int,
+                        pid varchar(40),
+                        seat_class varchar(40),
+                        foreign key (rid) references Routes(rid),
+                        foreign key (cid) references Customers(cid),
+                        foreign key (pid) references Payments(pid)
+                        );
+
+create table Payments(  pid varchar(40) primary key,
+                        type varchar(40),
+                        amount int);

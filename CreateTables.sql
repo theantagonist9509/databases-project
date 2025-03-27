@@ -20,11 +20,12 @@ create table Customers( cid int primary key,
                         consetion_class varchar(40),
                         age int );
 
-create table Bookings(  PNR int primary key,
+create table Bookings(  PNR int primary key auto_increment,
                         cid int,
                         rid int,
                         pid varchar(40),
                         seat_class varchar(40),
+                        time_of_booking datetime
                         foreign key (rid) references Routes(rid),
                         foreign key (cid) references Customers(cid),
                         foreign key (pid) references Payments(pid)

@@ -6,7 +6,25 @@ insert into Routes values
 (2,1,"Agra","Delhi","2025-03-03 17:11:11","2025-03-03 22:11:11"),
 (3,2,"Delhi","Kolkata","2025-03-03 10:20:20","2025-03-03 20:11:11");
 
+-- Customers
+insert into Customers values(1,"Ramesh","General",54),
+(2,"Somu","General",14),
+(3,"Grant","General",34);
+
+-- Bookings
+insert into Bookings values
+(1234,1,1,"XXXpayment1XXX","first_class","2025-03-03"),
+(1122,2,1,"XXXpayment2XXX","first_class","2025-02-02"),
+(123,3,2,"XXXpayment3XXX","first_class","2025-02-25");
+
+-- Payments
+insert into Payments values
+("XXXpayment1XXX","upi",200),
+("XXXpayment2XXX","upi",300),
+("XXXpayment3XXX","upi",400),
+("XXXpayment4XXX","upi",400);
 -- SeatsUsed is going to be weak entity set so we aren't gonna make direct additions to that
+
 -- Add SeatsUsed
 insert into SeatsUsed values(1,2,12);
 
@@ -30,3 +48,80 @@ BEGIN
         (select first_class,second_class from SeatsUsed where rid = routeid) as used;
 END$$
 DELIMITER ;
+
+DROP FUNCTION IF EXISTS AvailableSeatQuery;
+DELIMITER $$
+CREATE FUNCTION AvailableSeatQuery(routeid INT,class varchar(40))
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE ret INT DEFAULT 0;
+    CASE class
+        WHEN 'first_class' THEN
+            select tot.first_class - used.first_class into ret 
+                from
+                (select first_class from Trains where 
+                tid = (select tid from Routes where rid = routeid)) as tot,
+                (select first_class from SeatsUsed where rid = routeid) as used;
+
+        WHEN 'second_class' THEN
+            select tot.second_class - used.second_class into ret 
+                from
+                (select second_class from Trains where 
+                tid = (select tid from Routes where rid = routeid)) as tot,
+                (select second_class from SeatsUsed where rid = routeid) as used;
+    END CASE ;
+    RETURN ret;
+END$$
+DELIMITER ;
+
+-- List all passengers traveling on a specific train on a given date
+DROP PROCEDURE IF EXISTS TrainDateQuery;
+DELIMITER $$
+CREATE PROCEDURE TrainDateQuery(IN train_id INT,IN d DATE)
+BEGIN
+    select * from customers where cid in (select cid from Bookings where rid in (select rid from Routes where tid = train_id and DATEDIFF(departure,d) = 0));
+END$$
+DELIMITER ;
+
+-- Total revenue generated from ticket bookings over a specified period
+DROP PROCEDURE IF EXISTS RevenuePeriod;
+DELIMITER $$
+CREATE PROCEDURE RevenuePeriod(IN s DATE,IN e DATE)
+BEGIN
+    select sum(amount) as earning from Payments where pid in (select pid from Bookings where time_of_booking between s and e);
+END$$
+DELIMITER ;
+
+
+
+
+
+
+
+
+-- ACTUALLY DO A BOOKING
+DROP PROCEDURE IF EXISTS BookSeat;
+DELIMITER $$
+CREATE PROCEDURE BookSeat(  IN route_id INT,
+                            IN cust_id INT,
+                            IN payment_id varchar(40),IN payment_type varchar(40),IN payment_amount INT,
+                            IN class varchar(40))
+BEGIN
+    IF AvailableSeatQuery(route_id,class) != 0 THEN
+        insert into Payments values (payment_id,payment_type,payment_amount);
+        insert into Bookings(cid,rid,pid,seat_class,time_of_booking) values(cust_id,route_id,payment_id,class,now());
+        CASE class
+            WHEN 'first_class' THEN
+                update SeatsUsed SET first_class = first_class + 1 where rid = route_id; 
+            WHEN 'second_class' THEN
+                update SeatsUsed SET second_class = second_class + 1 where rid = route_id; 
+        END CASE ;
+    ELSE
+        select "No available seats for this class" as message;
+    END IF;
+END$$
+DELIMITER ;
+
+
+

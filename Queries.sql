@@ -123,5 +123,35 @@ BEGIN
 END$$
 DELIMITER ;
 
+-- ADD A TRAIN
+DROP PROCEDURE IF EXISTS AddTrain;
+DELIMITER $$
+CREATE PROCEDURE AddTrain(  IN train_id INT,IN first_class INT,IN second_class INT)
+BEGIN
+    insert into Trains values(train_id,first_class,second_class);
+END$$
+
+-- ADD CUSTOMER
+DELIMITER ;
+DROP PROCEDURE IF EXISTS AddCustomer;
+DELIMITER $$
+CREATE PROCEDURE AddCustomer(  IN cust_id INT,IN cname varchar(40),IN class varchar(40),IN cage INT)
+BEGIN
+    insert into Customers values(cust_id,cname,class,cage);
+END$$
+DELIMITER ;
+
+-- ROUTE
+DROP PROCEDURE IF EXISTS AddRoute;
+DELIMITER $$
+CREATE PROCEDURE AddRoute(  IN route_id INT,
+                            IN tid INT,
+                            IN origin varchar(40),IN dest varchar(40),
+                            IN departure datetime,IN arrival datetime)
+BEGIN
+    insert into Routes values(route_id,tid,origin,dest,departure,arrival);
+    insert into SeatsUsed values(route_id,0,0);
+END$$
+DELIMITER ;
 
 

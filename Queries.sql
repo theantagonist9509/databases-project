@@ -93,12 +93,14 @@ BEGIN
 END$$
 DELIMITER ;
 
-
-
-
-
-
-
+-- Show all routes from city1 to city2
+DROP PROCEDURE IF EXISTS FindRoutes;
+DELIMITER $$
+CREATE PROCEDURE FindRoutes(IN city1 varchar(40),IN city2 varchar(40))
+BEGIN
+    select * from routes where origin = city1 and dest = city2;
+END$$
+DELIMITER ;
 
 -- ACTUALLY DO A BOOKING
 DROP PROCEDURE IF EXISTS BookSeat;

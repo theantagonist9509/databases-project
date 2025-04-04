@@ -156,4 +156,29 @@ BEGIN
 END$$
 DELIMITER ;
 
+-- Cancellation
+DELIMITER $$
+CREATE PROCEDURE Cancel(IN PNR INT)
+BEGIN
+    DECLARE pid_copy varchar(40);
+    DECLARE type_copy varchar(40);
+    DECLARE amount_copy int;
 
+
+    SELECT pid into pid_copy
+    from Bookings
+    where Bookings.PNR = PNR;
+
+    
+    SELECT type,amount
+    INTO type_copy,amount_copy
+    FROM Payments
+    WHERE pid = pid_copy;
+
+    INSERT INTO Cancelation values(pid_copy,type_copy,amount_copy); 
+
+    delete from Bookings where Bookings.PNR = PNR;
+
+    delete from Payments where Payments.pid = pid_copy;
+END$$
+DELIMITER ;

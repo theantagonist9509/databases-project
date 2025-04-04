@@ -29,7 +29,7 @@ create table Bookings(  PNR int primary key auto_increment,
                         rid int,
                         pid varchar(40),
                         seat_class varchar(40),
-                        time_of_booking datetime
+                        time_of_booking datetime,
                         foreign key (rid) references Routes(rid),
                         foreign key (cid) references Customers(cid),
                         foreign key (pid) references Payments(pid)

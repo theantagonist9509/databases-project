@@ -11,18 +11,18 @@ insert into Customers values(1,"Ramesh","General",54),
 (2,"Somu","General",14),
 (3,"Grant","General",34);
 
--- Bookings
-insert into Bookings values
-(1234,1,1,"XXXpayment1XXX","first_class","2025-03-03"),
-(1122,2,1,"XXXpayment2XXX","first_class","2025-02-02"),
-(123,3,2,"XXXpayment3XXX","first_class","2025-02-25");
-
 -- Payments
 insert into Payments values
 ("XXXpayment1XXX","upi",200),
 ("XXXpayment2XXX","upi",300),
 ("XXXpayment3XXX","upi",400),
 ("XXXpayment4XXX","upi",400);
+
+-- Bookings
+insert into Bookings values
+(1234,1,1,"XXXpayment1XXX","first_class","2025-03-03"),
+(1122,2,1,"XXXpayment2XXX","first_class","2025-02-02"),
+(123,3,2,"XXXpayment3XXX","first_class","2025-02-25");
 -- SeatsUsed is going to be weak entity set so we aren't gonna make direct additions to that
 
 -- Add SeatsUsed

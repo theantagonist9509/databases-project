@@ -20,6 +20,10 @@ create table Customers( cid int primary key,
                         consetion_class varchar(40),
                         age int );
 
+create table Payments(  pid varchar(40) primary key,
+                        type varchar(40),
+                        amount int);
+
 create table Bookings(  PNR int primary key auto_increment,
                         cid int,
                         rid int,
@@ -31,6 +35,3 @@ create table Bookings(  PNR int primary key auto_increment,
                         foreign key (pid) references Payments(pid)
                         );
 
-create table Payments(  pid varchar(40) primary key,
-                        type varchar(40),
-                        amount int);

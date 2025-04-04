@@ -106,13 +106,18 @@ DELIMITER ;
 DROP PROCEDURE IF EXISTS BookSeat;
 DELIMITER $$
 CREATE PROCEDURE BookSeat(  IN route_id INT,
+                            IN seatnumber varchar(4),
                             IN cust_id INT,
-                            IN payment_id varchar(40),IN payment_type varchar(40),IN payment_amount INT,
+                            IN payment_id varchar(40),
+                            IN payment_type varchar(40),
+                            IN payment_amount INT,
                             IN class varchar(40))
 BEGIN
-    IF AvailableSeatQuery(route_id,class) != 0 THEN
+    IF AvailableSeatQuery(route_id,class) != 0 AND 
+    NOT EXISTS ( SELECT 1 FROM Bookings WHERE rid = route_id AND seat_number = seatnumber)  
+    THEN
         insert into Payments values (payment_id,payment_type,payment_amount);
-        insert into Bookings(cid,rid,pid,seat_class,time_of_booking) values(cust_id,route_id,payment_id,class,now());
+        insert into Bookings(cid,rid,pid,seat_class,seat_number,time_of_booking) values(cust_id,route_id,payment_id,class,seatnumber,now());
         CASE class
             WHEN 'first_class' THEN
                 update SeatsUsed SET first_class = first_class + 1 where rid = route_id; 

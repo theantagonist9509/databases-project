@@ -20,9 +20,9 @@ insert into Payments values
 
 -- Bookings
 insert into Bookings values
-(1234,1,1,"XXXpayment1XXX","first_class","2025-03-03"),
-(1122,2,1,"XXXpayment2XXX","first_class","2025-02-02"),
-(123,3,2,"XXXpayment3XXX","first_class","2025-02-25");
+(1234,1,1,"XXXpayment1XXX","first_class","A123","2025-03-03"),
+(1122,2,1,"XXXpayment2XXX","first_class","B212","2025-02-02"),
+(123,3,2,"XXXpayment3XXX","first_class","C321","2025-02-25");
 -- SeatsUsed is going to be weak entity set so we aren't gonna make direct additions to that
 
 -- Add SeatsUsed
@@ -162,28 +162,23 @@ END$$
 DELIMITER ;
 
 -- Cancellation
-DELIMITER $$
 CREATE PROCEDURE Cancel(IN PNR INT)
 BEGIN
-    DECLARE pid_copy varchar(40);
-    DECLARE type_copy varchar(40);
-    DECLARE amount_copy int;
-
-
-    SELECT pid into pid_copy
-    from Bookings
-    where Bookings.PNR = PNR;
-
+    DECLARE cid_copy INT;
+    DECLARE rid_copy INT;
+    DECLARE pid_copy VARCHAR(40);
+    DECLARE seat_class_copy VARCHAR(40);
+    DECLARE seat_number_copy VARCHAR(4);
+    DECLARE time_of_booking_copy DATETIME;
     
-    SELECT type,amount
-    INTO type_copy,amount_copy
-    FROM Payments
-    WHERE pid = pid_copy;
-
-    INSERT INTO Cancelation values(pid_copy,type_copy,amount_copy); 
-
-    delete from Bookings where Bookings.PNR = PNR;
-
-    delete from Payments where Payments.pid = pid_copy;
+    SELECT cid, rid, pid, seat_class, seat_number, time_of_booking
+    INTO cid_copy, rid_copy, pid_copy, seat_class_copy, seat_number_copy, time_of_booking_copy
+    FROM Bookings
+    WHERE Bookings.PNR = PNR;
+    INSERT INTO Cancelation (PNR, cid, rid, pid, seat_class, seat_number, time_of_booking)
+    VALUES (PNR, cid_copy, rid_copy, pid_copy, seat_class_copy, seat_number_copy, time_of_booking_copy);
+    DELETE FROM Bookings WHERE Bookings.PNR = PNR;
+    DELETE FROM Payments where Payments.pid = pid_copy;
 END$$
+
 DELIMITER ;

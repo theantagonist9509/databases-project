@@ -72,8 +72,8 @@ see_trains.place(x = 230, y = 100)
 # add customer
 customer_name = tk.Entry(AddCustomer)
 customer_age = tk.Entry(AddCustomer)
-customer_name.place(x = 230,y = 100)
-customer_age.place(x = 230,y = 200)
+customer_name.place(x = 270,y = 100)
+customer_age.place(x = 270,y = 200)
 
 def submitSubway():
     cname = customer_name.get()
@@ -90,9 +90,9 @@ Subway.place(x = 230, y = 300)
 
 #train view
 tvl1 = tk.Label(TrainView, text="Customer ID")
-tvl1.place(x=150, y=350-20)  
+tvl1.place(x=270, y=350-20)  
 cust_id = tk.Entry(TrainView)
-cust_id.place(x=150, y=350)
+cust_id.place(x=240, y=350)
 
 cursor.execute("SELECT rid,tid,origin,dest,departure from Routes order by tid,departure")
 
@@ -333,6 +333,6 @@ def submitPath():
 
 
 submit_path = tk.Button(TrainView,text= "Submit",command= submitPath)
-submit_path.place(x = 250,y = 500)
+submit_path.place(x = 270,y = 400)
 opening.tkraise()
 window.mainloop()

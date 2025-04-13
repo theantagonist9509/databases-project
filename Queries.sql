@@ -123,7 +123,50 @@ DROP PROCEDURE IF EXISTS QueryCancellations;
 DELIMITER $$
 CREATE PROCEDURE QueryCancellations(IN refunded BOOL)
 BEGIN
-    SELECT * FROM Cancellations WHERE refund_id;
+    SELECT * FROM Cancellations WHERE IF(refunded, refund_id IS NOT NULL, refund_id IS NULL)
+END$$
+DELIMITER ;
+
+-- Generate an itemized bill for a ticket including all charges
+DROP PROCEDURE IF EXISTS GenItemizedBill;
+DELIMITER $$
+CREATE PROCEDURE GenItemizedBill(IN _cid INT, IN _rid INT, IN _seat_class VARCHAR(40))
+BEGIN
+    DECLARE _concession_class VARCHAR(40);
+    DECLARE _origin VARCHAR(40);
+    DECLARE _dest VARCHAR(40);
+    DECLARE _base_price INT;
+    DECLARE concession_class_discount INT;
+    DECLARE seat_class_discount INT;
+    DECLARE final_price INT;
+
+    SELECT concession_class INTO _concession_class FROM Customers WHERE cid = _cid;
+
+    SELECT origin, dest, base_price INTO _origin, _dest, _base_price FROM Routes WHERE rid = _rid;
+
+    SET concession_class_discount = CASE _concession_class
+        WHEN 'general' THEN 0
+        WHEN 'senior_citizen' THEN 10
+        ELSE 0
+    END;
+
+    SET seat_class_discount = CASE _seat_class
+        WHEN 'first_class' THEN 0
+        WHEN 'second_class' THEN 10
+        ELSE 0
+    END;
+
+    SET final_price = ROUND(((100 - (concession_class_discount + seat_class_discount)) * _base_price) / 100);
+
+    SELECT
+        _origin AS origin,
+        _dest AS destination,
+        _seat_class AS seat_class,
+        _concession_class AS concession_class,
+        _base_price AS base_price,
+        seat_class_discount,
+        concession_class_discount,
+        final_price;
 END$$
 DELIMITER ;
 
@@ -190,18 +233,21 @@ DROP PROCEDURE IF EXISTS InsertRoute;
 DELIMITER $$
 CREATE PROCEDURE InsertRoute(
     IN _tid INT,
-    IN _origin varchar(40), IN _dest varchar(40),
-    IN _departure datetime, IN _arrival datetime
+    IN _origin VARCHAR(40), IN _dest VARCHAR(40),
+    IN _departure DATETIME, IN _arrival DATETIME,
+    IN _base_price INT
 ) BEGIN
     INSERT INTO
     Routes (
         tid,
         origin, dest,
-        departure, arrival
+        departure, arrival,
+        base_price
     ) VALUES (
         _tid,
         _origin, _dest,
-        _departure, _arrival
+        _departure, _arrival,
+        _base_price
     );
 END$$
 DELIMITER ;

@@ -11,6 +11,7 @@ create table Routes (
     dest varchar(40),
     departure datetime,
     arrival datetime,
+    base_price int,
     foreign key (tid) references Trains(tid)
 );
 

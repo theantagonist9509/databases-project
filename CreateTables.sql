@@ -46,7 +46,7 @@ create table BookingsRoutes (
     pnr int,
     rid int,
     foreign key (pnr) references Bookings(pnr),
-    foreign key (rid) references Routes(pnr)
+    foreign key (rid) references Routes(rid)
 );
 
 create table Cancellations like Bookings;

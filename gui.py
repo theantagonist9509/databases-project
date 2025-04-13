@@ -88,10 +88,31 @@ Subway.place(x = 230, y = 300)
 
 
 #train view
-tvl1 = tk.Label(TrainView,text = "Customer ID")
+tvl1 = tk.Label(TrainView, text="Customer ID")
+tvl1.place(x=150, y=350-20)  
 cust_id = tk.Entry(TrainView)
-tvl1.place(x = 300,y = 300)
-cust_id.place(x = 300,y = 350)
+cust_id.place(x=150, y=350)
+
+tvl2 = tk.Label(TrainView, text="Seat Class")
+tvl2.place(x=350, y=350-20)  
+seat_class = tk.Entry(TrainView)
+seat_class.place(x=350, y=350)
+
+tvl3 = tk.Label(TrainView, text="Payment ID")
+tvl3.place(x=80, y=400-20)  
+p_id = tk.Entry(TrainView)
+p_id.place(x=80, y=400)
+
+tvl4 = tk.Label(TrainView, text="Payment Type")
+tvl4.place(x=250, y=400-20)  
+p_type = tk.Entry(TrainView)
+p_type.place(x=250, y=400)
+
+tvl5 = tk.Label(TrainView, text="Payment Amount")
+tvl5.place(x=430, y=400-20)  
+p_amount = tk.Entry(TrainView)
+p_amount.place(x=430, y=400)
+
 
 cursor.execute("SELECT rid,tid,origin,dest,departure from Routes order by tid,departure")
 
@@ -108,12 +129,18 @@ def createSeatMatrix(tid,start,end):
     cursor.execute("SELECT first_class,second_class from Trains where tid = %s",(tid,))
     first_class,second_class = cursor.fetchone()
     routes = train_data[tid]["routes"][start:end]
-    for i in range(1,first_class + second_class + 1):
-        cursor.executemany("SELECT AvailableSeatQuery(%s,%s)",[(x,i) for x in routes])
-        for x in cursor: available[i] = available[i] and x
-    
     seats = [x for x in range(1,first_class + second_class + 1)]
     available = [1 for x in range(1,first_class + second_class + 1)]
+
+    for i in range(len(seats)):
+        print(routes)
+        for route in routes:
+            cursor.execute("SELECT AvailableSeatQuery(%s, %s)", (route, seats[i]))
+            result = cursor.fetchone()
+            if result:
+                available[i] = available[i] and result[0]
+    
+    
     seatMatrix = tk.Toplevel()
     seatMatrix.geometry("600x600")
      
@@ -205,14 +232,22 @@ class TrainWidget():
 train_widgets = [TrainWidget(TrainView,train_data[i]["places"],30,20 + 30 * num,i) for num,i in enumerate(train_data.keys())]
 
 def submitPath():
-    ret = []
-    for i in range(len(train_widgets)):
-        ret.append(train_widgets[i].getCheckboxes())
-    print(ret)
-    return ret
+    customer_id = cust_id.get()
+    Seat_Class = seat_class.get()
+    Payment_ID = p_id.get()
+    Payment_Type = p_type.get()
+    Payment_Amount = p_amount.get()
+    # rids = {trainid:{"routes":[],seatnumber:INT}}
+    rids = {}
+    for x in train_widgets:
+        if(len(x.getCheckboxes())):
+            start,stop = x.getCheckboxes()
+            rids[x.tid] = {"routes":train_data[x.tid]["routes"][start:stop],"seatnumber":int(x.seatEntry.get())}
+    print(rids)
+
+
 
 submit_path = tk.Button(TrainView,text= "Submit",command= submitPath)
-submit_path.place(x = 200,y = 200)
+submit_path.place(x = 250,y = 500)
 opening.tkraise()
-createSeatMatrix(1,0,1)
 window.mainloop()

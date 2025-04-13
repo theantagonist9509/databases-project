@@ -1,11 +1,11 @@
 create table Trains (
-    tid int primary key,
+    tid int primary key auto_increment,
     first_class int,
     second_class int
 );
 
 create table Routes (
-    rid int primary key,
+    rid int primary key auto_increment,
     tid int,
     origin varchar(40),
     dest varchar(40),
@@ -16,11 +16,12 @@ create table Routes (
 
 create table Customers (
     cid int primary key auto_increment,
-    name varchar(40),
+    cname varchar(40),
     consetion_class varchar(40),
     age int
 );
 
+-- TODO add payment time to this itself, since the bookings table will be cleansed of rows of past routes
 create table Payments (
     pid varchar(40) primary key,
     ptype varchar(40),
@@ -43,13 +44,17 @@ create table Bookings (
 );
 
 create table BookingsRoutes (
+    -- No FK contraint for this since it can be from Bookings or Cancellations
     pnr int,
+
     rid int,
-    foreign key (pnr) references Bookings(pnr),
     foreign key (rid) references Routes(rid)
 );
 
 create table Cancellations like Bookings;
+
+-- Remove auto_increment attribute
+alter table Cancellations modify pnr varchar(40) not null;
 
 -- Identifier for the refund transaction; NULL -> Not yet refunded
 alter table Cancellations add column refund_id varchar(40);

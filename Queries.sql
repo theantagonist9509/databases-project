@@ -1,15 +1,3 @@
--- Add Train
-insert into Trains values(1,10,100),(2,15,150),(3,2,20);
--- Add Routes
-insert into Routes values
-(1,1,"Delhi","Agra","2025-03-03 11:11:11","2025-03-03 16:11:11"),
-(2,1,"Agra","Delhi","2025-03-03 17:11:11","2025-03-03 22:11:11"),
-(3,2,"Delhi","Kolkata","2025-03-03 10:20:20","2025-03-03 20:11:11");
--- Customers
-insert into Customers values(1,"Ramesh","General",54),
-(2,"Somu","General",14),
-(3,"Grant","General",34);
-
 -- Train Schedule Lookup
 DELIMITER $$
 CREATE PROCEDURE TrainScheduleLookup(IN trainid INT)
@@ -80,7 +68,7 @@ BEGIN
     select rid into ret from 
     Routes NATURAL JOIN 
     BookingsRoutes NATURAL JOIN Bookings 
-    where btype = 'normal' GROUP BY rid ORDER BY count(pnr) DESC LIMIT 1;
+    where btype = 'normal' GROUP BY rid ORDER BY COUNT(pnr) DESC LIMIT 1;
     RETURN ret;
 END $$
 DELIMITER ;
@@ -90,82 +78,154 @@ DROP PROCEDURE IF EXISTS FindDirectRoutes;
 DELIMITER $$
 CREATE PROCEDURE FindDirectRoutes(IN city1 varchar(40), IN city2 varchar(40))
 BEGIN
-    SELECT * FROM Routes WHERE origin = city1 and dest = city2;
+    SELECT * FROM Routes WHERE origin = city1 AND dest = city2;
 END$$
 DELIMITER ;
 
--- Actually do a booking
-DROP PROCEDURE IF EXISTS BookSeat;
+-- Retrieve all waitlisted passengers for a particular train
+DROP PROCEDURE IF EXISTS QueryRACCustomers;
 DELIMITER $$
-CREATE PROCEDURE BookSeat(
-    IN route_id INT,
-    IN seatnumber int,
-    IN cust_id INT,
-    IN payment_id varchar(40),
-    IN payment_type varchar(40),
-    IN payment_amount INT,
-    IN class varchar(40)
-)   BEGIN
-    INSERT INTO Payments VALUES (payment_id, payment_type, payment_amount);
+CREATE PROCEDURE QueryRACCustomers(IN _tid INT)
+BEGIN
+    SELECT Customers.*
+    FROM Bookings
+    NATURAL JOIN BookingsRoutes
+    NATURAL JOIN Routes
+    WHERE tid = _tid
+    AND btype = 'rac';
+END$$
+DELIMITER 
 
-    IF AvailableSeatQuery(route_id, seatnumber)
-    THEN
-    ELSE
+-- Find total amount that needs to be refunded for cancelling a train
+DROP FUNCTION IF EXISTS GetTrainCancelTotalRefund;
+DELIMITER $$
+CREATE FUNCTION GetTrainCancelTotalRefund(_tid INT)
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total_refund INT;
+    
+    SELECT SUM(amount) INTO total_refund
+    FROM Payments
+    NATURAL JOIN Bookings
+    NATURAL JOIN BookingsRoutes
+    NATURAL JOIN Routes
+    NATURAL JOIN Trains
+    WHERE tid = _tid
+    AND btype = 'normal';
+    
+    RETURN IFNULL(total_refund, 0);
+END $$
+DELIMITER ;
+
+-- Cancellation records with refund status
+DROP PROCEDURE IF EXISTS QueryCancellations;
+DELIMITER $$
+CREATE PROCEDURE QueryCancellations(IN refunded BOOL)
+BEGIN
+    SELECT * FROM Cancellations WHERE refund_id;
+END$$
+DELIMITER ;
+
+-- Create a booking
+DROP PROCEDURE IF EXISTS CreateBooking;
+DELIMITER $$
+CREATE PROCEDURE CreateBooking(
+    IN _cid int,
+    IN _pid INT,
+    IN _ptype varchar(40),
+    IN _amount INT,
+    IN _btype varchar(40),
+    IN _seat_class varchar(40),
+    IN _seat_number varchar(40)
+) BEGIN
+    INSERT INTO Payments VALUES (_pid, _ptype, _amount);
+
+    INSERT INTO
+    Bookings    (cid, pid, btype, seat_class, seat_number, time_of_booking)
+    VALUES      (_cid, _pid, _btype, _seat_class, _seat_number, now());
+END$$
+DELIMITER ;
+
+-- Insert into BookingsRoutes
+DROP PROCEDURE IF EXISTS InsertBookingRoute;
+DELIMITER $$
+CREATE PROCEDURE InsertBookingRoute(
+    IN _pnr INT,
+    IN _rid INT
+) BEGIN
+    INSERT INTO BookingsRoutes VALUES (_pnr, _rid);
+END$$
+DELIMITER ;
+
+-- Insert into Trains
+DROP PROCEDURE IF EXISTS InsertTrain;
+DELIMITER $$
+CREATE PROCEDURE InsertTrain(
+    IN _first_class INT,
+    IN _second_class INT
+) BEGIN
+    INSERT INTO
+    Trains (
+        first_class,
+        second_class
+    ) VALUES (
+        _first_class,
+        _second_class
+    );
+END$$
+DELIMITER ;
+
+-- Insert into Customers
+DROP PROCEDURE IF EXISTS InsertCustomer;
+DELIMITER $$
+CREATE PROCEDURE InsertCustomer(IN _cname varchar(40), IN _concession_class varchar(40), IN _age INT)
+BEGIN
+    INSERT INTO Customers (cname, concession_class, age) VALUES (_cname, _concession_class, _age);
+END$$
+DELIMITER ;
+
+-- Insert into Routes
+DROP PROCEDURE IF EXISTS InsertRoute;
+DELIMITER $$
+CREATE PROCEDURE InsertRoute(
+    IN _tid INT,
+    IN _origin varchar(40), IN _dest varchar(40),
+    IN _departure datetime, IN _arrival datetime
+) BEGIN
+    INSERT INTO
+    Routes (
+        tid,
+        origin, dest,
+        departure, arrival
+    ) VALUES (
+        _tid,
+        _origin, _dest,
+        _departure, _arrival
+    );
+END$$
+DELIMITER ;
+
+-- Bookings can be cancelled by simply deleting them from the table
+DROP TRIGGER IF EXISTS AfterBookingsDelete
+DELIMITER $$
+CREATE TRIGGER AfterBookingsDelete
+BEFORE DELETE ON Bookings
+FOR EACH ROW
+BEGIN
+    DECLARE earliest_departure DATETIME;
+    
+    SELECT MIN(departure)
+    INTO earliest_departure
+    FROM BookingsRoutes
+    NATURAL JOIN Routes
+    WHERE pnr = OLD.pnr;
+
+    -- Eligible for refund
+    IF TIMESTAMPDIFF(DAY, OLD.time_of_booking, earliest_departure) > 1 THEN
+        INSERT INTO Cancellations SELECT OLD.*, NULL;
     END IF;
 
-    INSERT INTO Bookings (cid,rid,pid,seat_class,seat_number,time_of_booking) values (cust_id,route_id,payment_id,class,seatnumber,now());
-END$$
-DELIMITER ;
-
--- ADD A TRAIN
-DROP PROCEDURE IF EXISTS AddTrain;
-DELIMITER $$
-CREATE PROCEDURE AddTrain(  IN train_id INT,IN first_class INT,IN second_class INT)
-BEGIN
-    insert into Trains values(train_id,first_class,second_class);
-END$$
-DELIMITER ;
-
--- ADD CUSTOMER
-DROP PROCEDURE IF EXISTS AddCustomer;
-DELIMITER $$
-CREATE PROCEDURE AddCustomer(IN cname varchar(40),IN class varchar(40),IN cage INT)
-BEGIN
-    insert into Customers(name,consetion_class,age) values(cname,class,cage);
-END$$
-DELIMITER ;
-
--- ROUTE
-DROP PROCEDURE IF EXISTS AddRoute;
-DELIMITER $$
-CREATE PROCEDURE AddRoute(  IN route_id INT,
-                            IN tid INT,
-                            IN origin varchar(40),IN dest varchar(40),
-                            IN departure datetime,IN arrival datetime)
-BEGIN
-    insert into Routes values(route_id,tid,origin,dest,departure,arrival);
-END$$
-DELIMITER ;
-
--- Cancellation
-DROP PROCEDURE IF EXISTS Cancel;
-DELIMITER $$
-CREATE PROCEDURE Cancel(IN PNR INT)
-BEGIN
-    DECLARE cid_copy INT;
-    DECLARE rid_copy INT;
-    DECLARE pid_copy VARCHAR(40);
-    DECLARE seat_class_copy VARCHAR(40);
-    DECLARE seat_number_copy VARCHAR(4);
-    DECLARE time_of_booking_copy DATETIME;
-    
-    SELECT cid, rid, pid, seat_class, seat_number, time_of_booking
-    INTO cid_copy, rid_copy, pid_copy, seat_class_copy, seat_number_copy, time_of_booking_copy
-    FROM Bookings
-    WHERE Bookings.PNR = PNR;
-    INSERT INTO Cancelation (PNR, cid, rid, pid, seat_class, seat_number, time_of_booking)
-    VALUES (PNR, cid_copy, rid_copy, pid_copy, seat_class_copy, seat_number_copy, time_of_booking_copy);
-    DELETE FROM Bookings WHERE Bookings.PNR = PNR;
-    DELETE FROM Payments where Payments.pid = pid_copy;
+    DELETE FROM BookingsRoutes WHERE pnr = OLD.pnr;
 END$$
 DELIMITER ;

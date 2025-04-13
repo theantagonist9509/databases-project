@@ -52,6 +52,7 @@ create table BookingsRoutes (
     rid int,
     foreign key (rid) references Routes(rid)
 );
+CREATE INDEX idx_bookingsroutes_pnr_rid ON BookingsRoutes(pnr, rid);
 
 create table Cancellations like Bookings;
 

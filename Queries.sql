@@ -89,7 +89,7 @@ CREATE PROCEDURE BookSeat(
     IN payment_type varchar(40),
     IN payment_amount INT,
     IN class varchar(40)
-) BEGIN
+)   BEGIN
     INSERT INTO Payments VALUES (payment_id, payment_type, payment_amount);
 
     IF AvailableSeatQuery(route_id, seatnumber)

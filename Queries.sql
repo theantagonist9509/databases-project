@@ -5,28 +5,10 @@ insert into Routes values
 (1,1,"Delhi","Agra","2025-03-03 11:11:11","2025-03-03 16:11:11"),
 (2,1,"Agra","Delhi","2025-03-03 17:11:11","2025-03-03 22:11:11"),
 (3,2,"Delhi","Kolkata","2025-03-03 10:20:20","2025-03-03 20:11:11");
-
 -- Customers
 insert into Customers values(1,"Ramesh","General",54),
 (2,"Somu","General",14),
 (3,"Grant","General",34);
-
--- Payments
-insert into Payments values
-("XXXpayment1XXX","upi",200),
-("XXXpayment2XXX","upi",300),
-("XXXpayment3XXX","upi",400),
-("XXXpayment4XXX","upi",400);
-
--- Bookings
-insert into Bookings values
-(1234,1,1,"XXXpayment1XXX","first_class","A123","2025-03-03"),
-(1122,2,1,"XXXpayment2XXX","first_class","B212","2025-02-02"),
-(123,3,2,"XXXpayment3XXX","first_class","C321","2025-02-25");
--- SeatsUsed is going to be weak entity set so we aren't gonna make direct additions to that
-
--- Add SeatsUsed
-insert into SeatsUsed values(1,2,12);
 
 -- Train Schedule Lookup
 DELIMITER $$
@@ -35,42 +17,19 @@ BEGIN
     select * from Routes where tid = trainid;
 END$$
 DELIMITER ;
-
--- Available Seat Query
-DROP PROCEDURE IF EXISTS AvailableSeatQuery;
-DELIMITER $$
-CREATE PROCEDURE AvailableSeatQuery(IN routeid INT)
-BEGIN
-    select tot.first_class - used.first_class as first_class,
-    tot.second_class - used.second_class as second_class from
-        (select first_class,second_class from Trains where 
-        tid = (select tid from Routes where rid = routeid)) as tot,
-        (select first_class,second_class from SeatsUsed where rid = routeid) as used;
-END$$
-DELIMITER ;
-
+-- Check seat Availability
 DROP FUNCTION IF EXISTS AvailableSeatQuery;
 DELIMITER $$
-CREATE FUNCTION AvailableSeatQuery(routeid INT,class varchar(40))
+CREATE FUNCTION AvailableSeatQuery(routeid INT,seat_num INT)
 RETURNS INT
 DETERMINISTIC
 BEGIN
-    DECLARE ret INT DEFAULT 0;
-    CASE class
-        WHEN 'first_class' THEN
-            select tot.first_class - used.first_class into ret 
-                from
-                (select first_class from Trains where 
-                tid = (select tid from Routes where rid = routeid)) as tot,
-                (select first_class from SeatsUsed where rid = routeid) as used;
+    DECLARE ret INT DEFAULT 1;
 
-        WHEN 'second_class' THEN
-            select tot.second_class - used.second_class into ret 
-                from
-                (select second_class from Trains where 
-                tid = (select tid from Routes where rid = routeid)) as tot,
-                (select second_class from SeatsUsed where rid = routeid) as used;
-    END CASE ;
+    IF EXISTS (SELECT 1 FROM Bookings WHERE rid = routeid AND seat_number = seat_num) THEN
+        SET ret = 0;
+    END IF;
+    
     RETURN ret;
 END$$
 DELIMITER ;
@@ -106,26 +65,20 @@ DELIMITER ;
 DROP PROCEDURE IF EXISTS BookSeat;
 DELIMITER $$
 CREATE PROCEDURE BookSeat(  IN route_id INT,
-                            IN seatnumber varchar(4),
+                            IN seatnumber int,
                             IN cust_id INT,
                             IN payment_id varchar(40),
                             IN payment_type varchar(40),
                             IN payment_amount INT,
                             IN class varchar(40))
 BEGIN
-    IF AvailableSeatQuery(route_id,class) != 0 AND 
-    NOT EXISTS ( SELECT 1 FROM Bookings WHERE rid = route_id AND seat_number = seatnumber)  
+    IF AvailableSeatQuery(route_id,seatnumber) != 0
     THEN
         insert into Payments values (payment_id,payment_type,payment_amount);
         insert into Bookings(cid,rid,pid,seat_class,seat_number,time_of_booking) values(cust_id,route_id,payment_id,class,seatnumber,now());
-        CASE class
-            WHEN 'first_class' THEN
-                update SeatsUsed SET first_class = first_class + 1 where rid = route_id; 
-            WHEN 'second_class' THEN
-                update SeatsUsed SET second_class = second_class + 1 where rid = route_id; 
-        END CASE ;
     ELSE
-        select "No available seats for this class" as message;
+        insert into Payments values (payment_id,payment_type,payment_amount);
+        insert into WaitList(cid,rid,pid,seat_class,seat_number,time_of_booking) values(cust_id,route_id,payment_id,class,seatnumber,now());
     END IF;
 END$$
 DELIMITER ;

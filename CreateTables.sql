@@ -37,7 +37,7 @@ create table Bookings(  PNR int primary key auto_increment,
                         foreign key (pid) references Payments(pid)
                         );
 
-alter table Bookings add seat_number varchar(4) after seat_class;
+alter table Bookings add seat_number INT after seat_class;
 
 create table Cancelation(   pid varchar(40) primary key,
                             type varchar(40),
@@ -52,3 +52,5 @@ create table WaitList   (PNR int primary key auto_increment,
                         foreign key (rid) references Routes(rid),
                         foreign key (cid) references Customers(cid),
                         foreign key (pid) references Payments(pid));
+
+alter table WaitList add seat_number INT after seat_class;

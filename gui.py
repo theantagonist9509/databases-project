@@ -50,7 +50,7 @@ class TrainWidget():
         for i, var in enumerate(self.button_vars):
             if var.get():
                 checked_places.append(i)
-        return [seat,checked_places]
+        return [int(seat),checked_places]
 
 
 

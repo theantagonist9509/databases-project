@@ -7,28 +7,28 @@ INSERT INTO Trains (tid, first_class, second_class) VALUES (105, 15, 55);
 
 -- Routes
 INSERT INTO Routes (rid, tid, origin, dest, departure, arrival) VALUES 
-(200, 101, 'Mumbai', 'Delhi', '2025-04-15 08:30:00', '2025-04-16 10:45:00');
+(200, 101, 'Mumbai', 'Delhi', '2025-04-15 08:30:00', '2025-04-16 10:45:00',400);
 INSERT INTO Routes (rid, tid, origin, dest, departure, arrival) VALUES 
-(201, 101, 'Delhi', 'Patna', '2025-04-16 10:55:00', '2025-04-16 22:55:00');
+(201, 101, 'Delhi', 'Patna', '2025-04-16 10:55:00', '2025-04-16 22:55:00',500);
 
 INSERT INTO Routes (rid, tid, origin, dest, departure, arrival) VALUES 
-(210, 102, 'Chennai', 'Bangalore', '2025-04-16 15:00:00', '2025-04-16 19:30:00');
+(210, 102, 'Chennai', 'Bangalore', '2025-04-16 15:00:00', '2025-04-16 19:30:00',400);
 INSERT INTO Routes (rid, tid, origin, dest, departure, arrival) VALUES 
-(211, 102,'Bangalore','Kolkata', '2025-04-16 19:40:00', '2025-04-17 01:10:00');
+(211, 102,'Bangalore','Kolkata', '2025-04-16 19:40:00', '2025-04-17 01:10:00',200);
 INSERT INTO Routes (rid, tid, origin, dest, departure, arrival) VALUES 
-(212, 102,'Kolkata','Noida', '2025-04-17 01:10:00', '2025-04-17 10:40:00');
+(212, 102,'Kolkata','Noida', '2025-04-17 01:10:00', '2025-04-17 10:40:00',200);
 INSERT INTO Routes (rid, tid, origin, dest, departure, arrival) VALUES 
-(213, 102,'Noida','Jaipur', '2025-04-17 10:55:00', '2025-04-17 19:10:00');
+(213, 102,'Noida','Jaipur', '2025-04-17 10:55:00', '2025-04-17 19:10:00',100);
 
 
 INSERT INTO Routes (rid, tid, origin, dest, departure, arrival) VALUES 
-(223, 103, 'Kolkata', 'Hyderabad', '2025-04-17 22:15:00', '2025-04-18 12:45:00');
+(223, 103, 'Kolkata', 'Hyderabad', '2025-04-17 22:15:00', '2025-04-18 12:45:00',500);
 
 INSERT INTO Routes (rid, tid, origin, dest, departure, arrival) VALUES 
-(234, 104, 'Delhi', 'Jaipur', '2025-04-18 07:00:00', '2025-04-18 12:30:00');
+(234, 104, 'Delhi', 'Jaipur', '2025-04-18 07:00:00', '2025-04-18 12:30:00',900);
 
 INSERT INTO Routes (rid, tid, origin, dest, departure, arrival) VALUES 
-(245, 105, 'Bangalore', 'Mumbai', '2025-04-19 14:45:00', '2025-04-20 08:15:00');
+(245, 105, 'Bangalore', 'Mumbai', '2025-04-19 14:45:00', '2025-04-20 08:15:00',800);
 
 
 -- Customers

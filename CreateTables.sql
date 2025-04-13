@@ -21,6 +21,7 @@ create table Customers (
     age int
 );
 
+-- TODO add payment time to this itself, since the bookings table will be cleansed of rows of past routes
 create table Payments (
     pid varchar(40) primary key,
     ptype varchar(40),
@@ -43,9 +44,10 @@ create table Bookings (
 );
 
 create table BookingsRoutes (
+    -- No FK contraint for this since it can be from Bookings or Cancellations
     pnr int,
+
     rid int,
-    foreign key (pnr) references Bookings(pnr),
     foreign key (rid) references Routes(rid)
 );
 

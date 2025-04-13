@@ -68,7 +68,7 @@ BEGIN
     select rid into ret from 
     Routes NATURAL JOIN 
     BookingsRoutes NATURAL JOIN Bookings 
-    where btype = 'normal' GROUP BY rid ORDER BY count(pnr) DESC LIMIT 1;
+    where btype = 'normal' GROUP BY rid ORDER BY COUNT(pnr) DESC LIMIT 1;
     RETURN ret;
 END $$
 DELIMITER ;
@@ -79,6 +79,51 @@ DELIMITER $$
 CREATE PROCEDURE FindDirectRoutes(IN city1 varchar(40), IN city2 varchar(40))
 BEGIN
     SELECT * FROM Routes WHERE origin = city1 AND dest = city2;
+END$$
+DELIMITER ;
+
+-- Retrieve all waitlisted passengers for a particular train
+DROP PROCEDURE IF EXISTS QueryRACCustomers;
+DELIMITER $$
+CREATE PROCEDURE QueryRACCustomers(IN _tid INT)
+BEGIN
+    SELECT Customers.*
+    FROM Bookings
+    NATURAL JOIN BookingsRoutes
+    NATURAL JOIN Routes
+    WHERE tid = _tid
+    AND btype = 'rac';
+END$$
+DELIMITER 
+
+-- Find total amount that needs to be refunded for cancelling a train
+DROP FUNCTION IF EXISTS GetTrainCancelTotalRefund;
+DELIMITER $$
+CREATE FUNCTION GetTrainCancelTotalRefund(_tid INT)
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total_refund INT;
+    
+    SELECT SUM(amount) INTO total_refund
+    FROM Payments
+    NATURAL JOIN Bookings
+    NATURAL JOIN BookingsRoutes
+    NATURAL JOIN Routes
+    NATURAL JOIN Trains
+    WHERE tid = _tid
+    AND btype = 'normal';
+    
+    RETURN IFNULL(total_refund, 0);
+END $$
+DELIMITER ;
+
+-- Cancellation records with refund status
+DROP PROCEDURE IF EXISTS QueryCancellations;
+DELIMITER $$
+CREATE PROCEDURE QueryCancellations(IN refunded BOOL)
+BEGIN
+    SELECT * FROM Cancellations WHERE refund_id;
 END$$
 DELIMITER ;
 
@@ -161,16 +206,26 @@ CREATE PROCEDURE InsertRoute(
 END$$
 DELIMITER ;
 
--- Cancellation
-DROP PROCEDURE IF EXISTS CancelBooking;
+-- Bookings can be cancelled by simply deleting them from the table
+DROP TRIGGER IF EXISTS AfterBookingsDelete
 DELIMITER $$
-CREATE PROCEDURE CancelBooking(IN _pnr INT)
+CREATE TRIGGER AfterBookingsDelete
+BEFORE DELETE ON Bookings
+FOR EACH ROW
 BEGIN
-    INSERT INTO Cancellations
-    SELECT * FROM Bookings
-    WHERE pnr = _pnr;
+    DECLARE earliest_departure DATETIME;
     
-    DELETE FROM Bookings
-    WHERE pnr = _pnr;
+    SELECT MIN(departure)
+    INTO earliest_departure
+    FROM BookingsRoutes
+    NATURAL JOIN Routes
+    WHERE pnr = OLD.pnr;
+
+    -- Eligible for refund
+    IF TIMESTAMPDIFF(DAY, OLD.time_of_booking, earliest_departure) > 1 THEN
+        INSERT INTO Cancellations SELECT OLD.*, NULL;
+    END IF;
+
+    DELETE FROM BookingsRoutes WHERE pnr = OLD.pnr;
 END$$
 DELIMITER ;

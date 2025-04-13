@@ -17,16 +17,23 @@ BEGIN
     select * from Routes where tid = trainid;
 END$$
 DELIMITER ;
+
 -- Check seat Availability
 DROP FUNCTION IF EXISTS AvailableSeatQuery;
 DELIMITER $$
-CREATE FUNCTION AvailableSeatQuery(routeid INT,seat_num INT)
+CREATE FUNCTION AvailableSeatQuery(routeid INT, seat_num INT)
 RETURNS INT
 DETERMINISTIC
 BEGIN
     DECLARE ret INT DEFAULT 1;
 
-    IF EXISTS (SELECT 1 FROM Bookings WHERE rid = routeid AND seat_number = seat_num) THEN
+    IF EXISTS (
+        SELECT 1
+        FROM Bookings
+        NATURAL JOIN BookingsRoutes
+        NATURAL JOIN Routes
+        WHERE rid = routeid AND seat_number = seat_num
+    ) THEN
         SET ret = 0;
     END IF;
     
@@ -37,49 +44,60 @@ DELIMITER ;
 -- List all passengers traveling on a specific train on a given date
 DROP PROCEDURE IF EXISTS TrainDateQuery;
 DELIMITER $$
-CREATE PROCEDURE TrainDateQuery(IN train_id INT,IN d DATE)
+CREATE PROCEDURE TrainDateQuery(IN train_id INT, IN d DATE)
 BEGIN
-    select * from customers where cid in (select cid from Bookings where rid in (select rid from Routes where tid = train_id and DATEDIFF(departure,d) = 0));
+    SELECT Customers.*
+    FROM Customers
+    NATURAL JOIN Bookings
+    NATURAL JOIN BookingsRoutes
+    NATURAL JOIN Routes
+    WHERE tid = train_id
+    AND DATE(departure) = d
+    AND btype = 'normal';
 END$$
 DELIMITER ;
 
--- Total revenue generated from ticket bookings over a specified period
+-- Total revenue generated from ticket bookings over a specified period (excluding RAC bookings)
 DROP PROCEDURE IF EXISTS RevenuePeriod;
 DELIMITER $$
-CREATE PROCEDURE RevenuePeriod(IN s DATE,IN e DATE)
+CREATE PROCEDURE RevenuePeriod(IN s DATE, IN e DATE)
 BEGIN
-    select sum(amount) as earning from Payments where pid in (select pid from Bookings where time_of_booking between s and e);
+    SELECT SUM(amount) AS earning 
+    FROM Bookings NATURAL JOIN Payments 
+    WHERE time_of_booking BETWEEN s AND e
+    AND booking_status != 'rac';
 END$$
 DELIMITER ;
 
--- Show all routes from city1 to city2
-DROP PROCEDURE IF EXISTS FindRoutes;
+-- Show all direct routes from city1 to city2
+DROP PROCEDURE IF EXISTS FindDirectRoutes;
 DELIMITER $$
-CREATE PROCEDURE FindRoutes(IN city1 varchar(40),IN city2 varchar(40))
+CREATE PROCEDURE FindDirectRoutes(IN city1 varchar(40), IN city2 varchar(40))
 BEGIN
-    select * from routes where origin = city1 and dest = city2;
+    SELECT * FROM Routes WHERE origin = city1 and dest = city2;
 END$$
 DELIMITER ;
 
--- ACTUALLY DO A BOOKING
+-- Actually do a booking
 DROP PROCEDURE IF EXISTS BookSeat;
 DELIMITER $$
-CREATE PROCEDURE BookSeat(  IN route_id INT,
-                            IN seatnumber int,
-                            IN cust_id INT,
-                            IN payment_id varchar(40),
-                            IN payment_type varchar(40),
-                            IN payment_amount INT,
-                            IN class varchar(40))
-BEGIN
-    IF AvailableSeatQuery(route_id,seatnumber) != 0
+CREATE PROCEDURE BookSeat(
+    IN route_id INT,
+    IN seatnumber int,
+    IN cust_id INT,
+    IN payment_id varchar(40),
+    IN payment_type varchar(40),
+    IN payment_amount INT,
+    IN class varchar(40)
+) BEGIN
+    INSERT INTO Payments VALUES (payment_id, payment_type, payment_amount);
+
+    IF AvailableSeatQuery(route_id, seatnumber)
     THEN
-        insert into Payments values (payment_id,payment_type,payment_amount);
-        insert into Bookings(cid,rid,pid,seat_class,seat_number,time_of_booking) values(cust_id,route_id,payment_id,class,seatnumber,now());
     ELSE
-        insert into Payments values (payment_id,payment_type,payment_amount);
-        insert into WaitList(cid,rid,pid,seat_class,seat_number,time_of_booking) values(cust_id,route_id,payment_id,class,seatnumber,now());
     END IF;
+
+    INSERT INTO Bookings (cid,rid,pid,seat_class,seat_number,time_of_booking) values (cust_id,route_id,payment_id,class,seatnumber,now());
 END$$
 DELIMITER ;
 
@@ -110,11 +128,12 @@ CREATE PROCEDURE AddRoute(  IN route_id INT,
                             IN departure datetime,IN arrival datetime)
 BEGIN
     insert into Routes values(route_id,tid,origin,dest,departure,arrival);
-    insert into SeatsUsed values(route_id,0,0);
 END$$
 DELIMITER ;
 
 -- Cancellation
+DROP PROCEDURE IF EXISTS Cancel;
+DELIMITER $$
 CREATE PROCEDURE Cancel(IN PNR INT)
 BEGIN
     DECLARE cid_copy INT;
@@ -133,5 +152,4 @@ BEGIN
     DELETE FROM Bookings WHERE Bookings.PNR = PNR;
     DELETE FROM Payments where Payments.pid = pid_copy;
 END$$
-
 DELIMITER ;

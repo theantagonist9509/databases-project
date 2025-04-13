@@ -1,5 +1,9 @@
 import tkinter as tk
 from mysql import connector
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 class ScrollableFrame(tk.Frame):
     def __init__(self, container, *args, **kwargs):
@@ -57,7 +61,12 @@ class TrainWidget():
 window = tk.Tk()
 window.geometry("600x600")
 
-db = connector.connect(user='root', password='root',host='localhost',database='TrainDB')
+db = connector.connect(
+    user=os.getenv("MYSQL_USER"),
+    password=os.getenv("MYSQL_PASSWORD"),
+    host=os.getenv("MYSQL_HOST"),
+    database=os.getenv("MYSQL_DATABASE"),
+)
 cursor = db.cursor()
 
 opening = tk.Frame(window)

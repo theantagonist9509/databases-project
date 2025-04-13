@@ -176,18 +176,23 @@ DROP PROCEDURE IF EXISTS CreateBooking;
 DELIMITER $$
 CREATE PROCEDURE CreateBooking(
     IN _cid int,
-    IN _pid INT,
+    IN _pid VARCHAR(40),
     IN _ptype varchar(40),
     IN _amount INT,
     IN _btype varchar(40),
     IN _seat_class varchar(40),
     IN _seat_number varchar(40)
 ) BEGIN
-    INSERT INTO Payments VALUES (_pid, _ptype, _amount);
+
+    IF NOT EXISTS(select 1 from Payments where pid = _pid) THEN
+        INSERT INTO Payments VALUES (_pid, _ptype, _amount);
+    END IF;
 
     INSERT INTO
     Bookings    (cid, pid, btype, seat_class, seat_number, time_of_booking)
     VALUES      (_cid, _pid, _btype, _seat_class, _seat_number, now());
+
+    SELECT LAST_INSERT_ID() AS pnr;
 END$$
 DELIMITER ;
 

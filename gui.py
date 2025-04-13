@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 from tkinter import font as tkfont
 from mysql import connector
 from dotenv import load_dotenv
@@ -93,27 +94,6 @@ tvl1.place(x=150, y=350-20)
 cust_id = tk.Entry(TrainView)
 cust_id.place(x=150, y=350)
 
-tvl2 = tk.Label(TrainView, text="Seat Class")
-tvl2.place(x=350, y=350-20)  
-seat_class = tk.Entry(TrainView)
-seat_class.place(x=350, y=350)
-
-tvl3 = tk.Label(TrainView, text="Payment ID")
-tvl3.place(x=80, y=400-20)  
-p_id = tk.Entry(TrainView)
-p_id.place(x=80, y=400)
-
-tvl4 = tk.Label(TrainView, text="Payment Type")
-tvl4.place(x=250, y=400-20)  
-p_type = tk.Entry(TrainView)
-p_type.place(x=250, y=400)
-
-tvl5 = tk.Label(TrainView, text="Payment Amount")
-tvl5.place(x=430, y=400-20)  
-p_amount = tk.Entry(TrainView)
-p_amount.place(x=430, y=400)
-
-
 cursor.execute("SELECT rid,tid,origin,dest,departure from Routes order by tid,departure")
 
 # train_data = {"tid": {"places":[],"routes":[]}}
@@ -133,7 +113,6 @@ def createSeatMatrix(tid,start,end):
     available = [1 for x in range(1,first_class + second_class + 1)]
 
     for i in range(len(seats)):
-        print(routes)
         for route in routes:
             cursor.execute("SELECT AvailableSeatQuery(%s, %s)", (route, seats[i]))
             result = cursor.fetchone()
@@ -233,17 +212,123 @@ train_widgets = [TrainWidget(TrainView,train_data[i]["places"],30,20 + 30 * num,
 
 def submitPath():
     customer_id = cust_id.get()
-    Seat_Class = seat_class.get()
-    Payment_ID = p_id.get()
-    Payment_Type = p_type.get()
-    Payment_Amount = p_amount.get()
     # rids = {trainid:{"routes":[],seatnumber:INT}}
     rids = {}
     for x in train_widgets:
         if(len(x.getCheckboxes())):
             start,stop = x.getCheckboxes()
-            rids[x.tid] = {"routes":train_data[x.tid]["routes"][start:stop],"seatnumber":int(x.seatEntry.get())}
-    print(rids)
+            cursor.execute("SELECT first_class,second_class FROM trains where tid = %s",(x.tid,))
+            first,second = cursor.fetchone()
+            seatnum = int(x.seatEntry.get())
+
+            available = 1
+            for route in train_data[x.tid]["routes"][start:stop]:
+                cursor.execute("SELECT AvailableSeatQuery(%s, %s)", (route, seatnum))
+                result = cursor.fetchone()
+                
+                print(result)
+                available = available and result[0]
+
+            rids[x.tid] = {"routes":train_data[x.tid]["routes"][start:stop],
+                           "seatnumber":seatnum,
+                           "seatclass":"first_class" if first >= seatnum else "second_class",
+                           "btype":'normal' if available else 'rac'}
+            
+            print(rids)
+
+    BillWindow = tk.Toplevel()
+    BillWindow.geometry("600x600")
+    BILLTEXT = tk.Label(BillWindow,text="BILL")
+    BILLTEXT.place(y = 10,x = 270)
+    Mytree = ttk.Treeview(BillWindow)
+    Mytree['columns'] = ("rid","origin","destination","base price","final price")
+
+    Mytree.column("#0", width=0)
+    Mytree.column("rid",width=100)
+    Mytree.column("origin",width=100)
+    Mytree.column("destination",width=100)
+    Mytree.column("base price",width=100)
+    Mytree.column("final price",width=100)
+
+    Mytree.heading("#0", text="")
+    Mytree.heading("rid", text="Route ID")
+    Mytree.heading("origin", text="Origin")
+    Mytree.heading("destination", text="Destination")
+    Mytree.heading("base price", text="Base Price")
+    Mytree.heading("final price", text="Final Price")
+
+    Mytree.pack(expand=False)
+    Mytree.place(y = 30,x = 40)
+
+    bill = []
+    for tid,data in rids.items():
+        for route in data["routes"]:
+            cursor.execute("CALL GenItemizedBill(%s,%s,%s)",(customer_id,route,data["seatclass"]))
+            origin,destination,seat_class,concession_class,base_price,seat_class_discount,concession_class_discount,final_price = cursor.fetchone()
+            while cursor.nextset():
+                pass 
+            bill.append([route,origin,destination,base_price,final_price])
+
+    IID = 0
+    for x in bill:
+        Mytree.insert(parent='',index='end',iid=IID,values= x)
+        IID+=1
+    
+    # Add a total row if needed
+    if bill:
+        total_price = sum(item[4] for item in bill)  # Sum of final prices
+        Mytree.insert(parent='', index='end', iid=len(bill), 
+                     values=("TOTAL", "", "", "", f"{total_price:.2f}"),
+                     tags=('total',))
+        Mytree.tag_configure('total', background='light gray', font=('Arial', 10, 'bold'))
+    
+   
+
+    tvl3 = tk.Label(BillWindow, text="Payment ID")
+    tvl3.place(x=80, y=400-20)  
+    p_id = tk.Entry(BillWindow)
+    p_id.place(x=80, y=400)
+
+    tvl4 = tk.Label(BillWindow, text="Payment Type")
+    tvl4.place(x=250, y=400-20)  
+    p_type = tk.Entry(BillWindow)
+    p_type.place(x=250, y=400)
+
+    tvl5 = tk.Label(BillWindow, text="Payment Amount")
+    tvl5.place(x=430, y=400-20)  
+    p_amount = tk.Entry(BillWindow)
+    p_amount.place(x=430, y=400)
+
+    def do_a_booking():
+        Payment_ID = p_id.get()
+        Payment_Type = p_type.get()
+        Payment_amount = p_amount.get()
+
+        for x,y in rids.items():
+            cursor.execute("CALL CreateBooking(%s,%s,%s,%s,%s,%s,%s)", (customer_id,
+                                                                        Payment_ID,
+                                                                        Payment_Type,
+                                                                        Payment_amount,
+                                                                        y["btype"],
+                                                                        y["seatclass"],
+                                                                        y["seatnumber"]
+                                                                        ))
+            pnr = cursor.fetchone()[0]
+            while cursor.nextset():
+                pass 
+     
+            db.commit()
+            for rid in y["routes"]:
+                cursor.execute("CALL InsertBookingRoute(%s,%s)",(pnr,rid))
+            db.commit()
+        BillWindow.destroy()
+
+        
+
+    DoABooking = tk.Button(BillWindow,text="Book",command=do_a_booking)
+    DoABooking.place(x = 270,y = 500)
+    
+    BillWindow.mainloop()
 
 
 

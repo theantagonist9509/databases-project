@@ -6,7 +6,7 @@ BEGIN
 END$$
 DELIMITER ;
 
--- Check seat Availability
+-- Check seat availability
 DROP FUNCTION IF EXISTS AvailableSeatQuery;
 DELIMITER $$
 CREATE FUNCTION AvailableSeatQuery(routeid INT, seat_num INT)
@@ -28,6 +28,40 @@ BEGIN
     RETURN ret;
 END$$
 DELIMITER ;
+
+-- Check seat availability based on class
+DROP FUNCTION IF EXISTS GetClassNumAvailableSeats;
+DELIMITER $$
+CREATE FUNCTION GetClassNumAvailableSeats(_rid INT, _seat_class VARCHAR(40))
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE _first_class INT;
+    DECLARE _second_class INT;
+
+    DECLARE num_taken INT;
+
+    SELECT first_class, second_class
+    INTO _first_class, _second_class
+    FROM Routes
+    NATURAL JOIN Trains
+    WHERE rid = _rid;
+
+    SELECT COUNT(*) INTO num_taken
+    FROM Bookings
+    NATURAL JOIN BookingsRoutes
+    WHERE rid = _rid
+    AND btype = 'normal'
+    AND seat_class = _seat_class;
+    
+    RETURN CASE _seat_class
+        WHEN 'first_class' THEN _first_class - num_taken
+        WHEN 'second_class' THEN _second_class - num_taken
+        ELSE 0
+    END;
+END$$
+DELIMITER ;
+
 
 -- List all passengers traveling on a specific train on a given date
 DROP PROCEDURE IF EXISTS TrainDateQuery;
@@ -259,25 +293,65 @@ END$$
 DELIMITER ;
 
 -- Bookings can be cancelled by simply deleting them from the table
-DROP TRIGGER IF EXISTS AfterBookingsDelete;
+DROP TRIGGER IF EXISTS BeforeBookingsDelete;
 DELIMITER $$
-CREATE TRIGGER AfterBookingsDelete
+CREATE TRIGGER BeforeBookingsDelete
 BEFORE DELETE ON Bookings
 FOR EACH ROW
 BEGIN
+    DECLARE refund_possible BOOL DEFAULT TRUE;
     DECLARE earliest_departure DATETIME;
+    DECLARE done INT DEFAULT 0;
+    DECLARE _pnr INT;
     
-    SELECT MIN(departure)
-    INTO earliest_departure
-    FROM BookingsRoutes
-    NATURAL JOIN Routes
-    WHERE pnr = OLD.pnr;
+    DECLARE cur CURSOR FOR
+    SELECT DISTINCT pnr
+    FROM Bookings b
+    JOIN BookingsRoutes br ON b.pnr = br.pnr
+    WHERE b.btype = 'rac'
+    AND b.seat_class = OLD.seat_class
+    AND br.rid IN (SELECT rid FROM BookingsRoutes WHERE pnr = OLD.pnr)
+    ORDER BY b.time_of_booking;
 
-    -- Eligible for refund
-    IF TIMESTAMPDIFF(DAY, OLD.time_of_booking, earliest_departure) > 1 THEN
-        INSERT INTO Cancellations SELECT OLD.*, NULL;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+
+    IF OLD.btype = 'normal' THEN
+        SELECT MIN(r.departure)
+        INTO earliest_departure
+        FROM BookingsRoutes br
+        JOIN Routes r ON br.rid = r.rid
+        WHERE br.pnr = OLD.pnr;
+
+        IF TIMESTAMPDIFF(DAY, OLD.time_of_booking, earliest_departure) < 1 THEN
+            SET refund_possible = FALSE;
+        END IF;
     END IF;
 
+    INSERT INTO Cancellations SELECT OLD.*, IF(refund_possible, NULL, 'N/A');
+
     DELETE FROM BookingsRoutes WHERE pnr = OLD.pnr;
+
+    -- Check for RAC openings
+    IF OLD.btype = 'normal' THEN
+        OPEN cur;
+        
+        rac_loop: LOOP
+            FETCH cur INTO _pnr;
+            
+            IF done = 1 THEN
+                LEAVE rac_loop;
+            END IF;
+
+            IF (
+                SELECT MIN(GetClassNumAvailableSeats(rid, OLD.seat_class))
+                FROM BookingsRoutes
+                WHERE pnr = _pnr
+            ) > 0 THEN
+                UPDATE Bookings SET btype = 'normal' WHERE pnr = _pnr;
+            END IF;
+        END LOOP rac_loop;
+
+        CLOSE cur;
+    END IF;
 END$$
 DELIMITER ;

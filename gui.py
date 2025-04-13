@@ -80,10 +80,10 @@ def submitSubway():
     print(cage)
     if( cage < 60 ): cclass = "General"
     else: cclass = "senior"
-    cursor.execute("CALL AddCustomer(%s,%s,%s)",(cname,cclass,cage))
+    cursor.execute("CALL InsertCustomer(%s,%s,%s)",(cname,cclass,cage))
     db.commit()
 
-Subway = tk.Button(AddCustomer,text = "Just Monika",width = 20,command = submitSubway)
+Subway = tk.Button(AddCustomer,text = "Insert Customer",width = 20,command = submitSubway)
 Subway.place(x = 230, y = 300)
 
 

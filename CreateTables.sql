@@ -11,9 +11,9 @@ create table Routes (
     dest varchar(40),
     departure datetime,
     arrival datetime,
-    base_price int,
     foreign key (tid) references Trains(tid)
 );
+ALTER TABLE ROUTES ADD base_price INT;
 
 create table Customers (
     cid int primary key auto_increment,
@@ -21,6 +21,7 @@ create table Customers (
     consetion_class varchar(40),
     age int
 );
+ALTER TABLE Customers RENAME COLUMN consetion_class TO concession_class;
 
 -- TODO add payment time to this itself, since the bookings table will be cleansed of rows of past routes
 create table Payments (

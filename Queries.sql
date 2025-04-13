@@ -84,7 +84,7 @@ DROP PROCEDURE IF EXISTS RevenuePeriod;
 DELIMITER $$
 CREATE PROCEDURE RevenuePeriod(IN s DATE, IN e DATE)
 BEGIN
-    SELECT SUM(amount) AS earning 
+    SELECT IFNULL(SUM(amount),0) AS earning 
     FROM Bookings NATURAL JOIN Payments 
     WHERE time_of_booking BETWEEN s AND e
     AND btype = 'normal';
@@ -125,10 +125,11 @@ BEGIN
     FROM Bookings
     NATURAL JOIN BookingsRoutes
     NATURAL JOIN Routes
+    NATURAL JOIN Customers
     WHERE tid = _tid
     AND btype = 'rac';
 END$$
-DELIMITER 
+DELIMITER ;
 
 -- Find total amount that needs to be refunded for cancelling a train
 DROP FUNCTION IF EXISTS GetTrainCancelTotalRefund;
@@ -157,8 +158,8 @@ DROP PROCEDURE IF EXISTS QueryCancellations;
 DELIMITER $$
 CREATE PROCEDURE QueryCancellations(IN refunded BOOL)
 BEGIN
-    SELECT * FROM Cancellations WHERE IF(refunded, refund_id IS NOT NULL, refund_id IS NULL)
-END$$
+    SELECT * FROM Cancellations WHERE IF(refunded, refund_id IS NOT NULL, refund_id IS NULL);
+END $$
 DELIMITER ;
 
 -- Generate an itemized bill for a ticket including all charges

@@ -65,8 +65,24 @@ BEGIN
     SELECT SUM(amount) AS earning 
     FROM Bookings NATURAL JOIN Payments 
     WHERE time_of_booking BETWEEN s AND e
-    AND booking_status != 'rac';
+    AND btype = 'normal';
 END$$
+DELIMITER ;
+
+-- Find Busiest Route based on passenger count excluding RAC
+DROP FUNCTION IF EXISTS BusiestRoute;
+DELIMITER $$
+CREATE FUNCTION BusiestRoute()
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE ret INT;
+    select rid into ret from 
+    Routes NATURAL JOIN 
+    BookingsRoutes NATURAL JOIN Bookings 
+    where btype = 'normal' GROUP BY rid ORDER BY count(pnr) DESC LIMIT 1;
+    RETURN ret;
+END $$
 DELIMITER ;
 
 -- Show all direct routes from city1 to city2

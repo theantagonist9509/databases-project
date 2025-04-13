@@ -137,14 +137,14 @@ CREATE PROCEDURE AddTrain(  IN train_id INT,IN first_class INT,IN second_class I
 BEGIN
     insert into Trains values(train_id,first_class,second_class);
 END$$
+DELIMITER ;
 
 -- ADD CUSTOMER
-DELIMITER ;
 DROP PROCEDURE IF EXISTS AddCustomer;
 DELIMITER $$
-CREATE PROCEDURE AddCustomer(  IN cust_id INT,IN cname varchar(40),IN class varchar(40),IN cage INT)
+CREATE PROCEDURE AddCustomer(IN cname varchar(40),IN class varchar(40),IN cage INT)
 BEGIN
-    insert into Customers values(cust_id,cname,class,cage);
+    insert into Customers(name,consetion_class,age) values(cname,class,cage);
 END$$
 DELIMITER ;
 

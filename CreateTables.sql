@@ -15,10 +15,12 @@ create table SeatsUsed( rid int,
                         second_class int,
                         foreign key (rid) references Routes(rid));
 
-create table Customers( cid int primary key,
+
+create table Customers( cid int primary key auto_increment,
                         name varchar(40),
                         consetion_class varchar(40),
                         age int );
+
 
 create table Payments(  pid varchar(40) primary key,
                         type varchar(40),

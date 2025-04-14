@@ -62,11 +62,11 @@ INSERT INTO Bookings (cid, pid, btype, seat_class, seat_number, time_of_booking)
 INSERT INTO Bookings (cid, pid, btype, seat_class, seat_number, time_of_booking) VALUES
 (4, 'PAY004', 'normal', 'second_class', 42, '2025-04-12 21:05:17');
 INSERT INTO Bookings (cid, pid, btype, seat_class, seat_number, time_of_booking) VALUES
-(5, 'PAY005', 'normal', 'second_class', 1, '2025-04-13 11:45:50');
+(5, 'PAY005', 'normal', 'first_class', 1, '2025-04-13 11:45:50');
 INSERT INTO Bookings (cid, pid, btype, seat_class, seat_number, time_of_booking) VALUES
-(6, 'PAY006', 'normal', 'second_class', 2, '2025-04-14 10:40:55');
+(6, 'PAY006', 'normal', 'first_class', 2, '2025-04-14 10:40:55');
 INSERT INTO Bookings (cid, pid, btype, seat_class, seat_number, time_of_booking) VALUES
-(7, 'PAY007', 'rac', 'second_class', NULL, '2025-04-14 09:41:30');
+(7, 'PAY007', 'rac', 'first_class', NULL, '2025-04-14 09:41:30');
 
 -- BookingsRoutes
 INSERT INTO BookingsRoutes (pnr, rid) VALUES (1, 3);

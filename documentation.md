@@ -4,131 +4,117 @@
 
 ![ER Diagram](er-diagram.jpeg)
 
-## Schema Documentation
+## Table Schema
 
-This section documents the database tables and their structure.
-
-### Tables
-
-#### Trains
+### Trains
 - **Attributes**: `tid` (PK, auto_increment), `tname`, `first_class`, `second_class`
-- **Description**: Stores information about trains including their unique ID, name, and number of seats available in first and second class.
+- **Description**: Stores information about trains including their identifier, name, and the number of seats available in each class.
 
-#### Routes
+### Routes
 - **Attributes**: `rid` (PK, auto_increment), `tid` (FK), `origin`, `dest`, `departure`, `arrival`, `base_price`
-- **Description**: Contains route information for trains including origin/destination cities, departure/arrival times, and base ticket price.
+- **Description**: Contains route information including origin and destination stations, departure and arrival times, and the base ticket price.
 
-#### Customers
+### Customers
 - **Attributes**: `cid` (PK, auto_increment), `cname`, `concession_class`, `age`
-- **Description**: Stores customer information including name, age, and eligibility for fare concessions (like senior citizen).
+- **Description**: Stores customer information including their name, age, and concession category which determines discount eligibility.
 
-#### Payments
+### Payments
 - **Attributes**: `pid` (PK), `ptype`, `amount`, `ptime`
-- **Description**: Records payment transactions with payment ID, payment method, amount paid, and timestamp.
+- **Description**: Records payment transactions with unique payment ID, payment type, amount, and timestamp of the transaction.
 
-#### Bookings
+### Bookings
 - **Attributes**: `pnr` (PK, auto_increment), `cid` (FK), `pid` (FK), `btype`, `seat_class`, `seat_number`, `time_of_booking`
-- **Description**: Stores ticket booking details with PNR number, customer reference, booking type (normal/RAC), seat information, and timestamp.
+- **Description**: Tracks ticket bookings with PNR number, customer ID, payment ID, booking type (normal/RAC), seat information, and booking timestamp.
 
-#### BookingsRoutes
+### BookingsRoutes
 - **Attributes**: `pnr`, `rid` (FK)
-- **Description**: Junction table linking bookings to routes, allowing tickets to include multiple route segments.
+- **Description**: Junction table linking bookings to routes, allowing a single booking to include multiple route segments.
 
-#### Cancellations
+### Cancellations
 - **Attributes**: Same as Bookings plus `refund_id`
-- **Description**: Records cancelled bookings with similar fields as Bookings plus additional refund tracking information.
+- **Description**: Records cancelled bookings with their original details and tracks refund status through `refund_id`.
 
-#### RACPromotionQueue
-- **Attributes**: `pnr`, `seat_number`
-- **Description**: Temporary table used to manage waiting list promotions when seats become available through cancellations.
+### RACPromotionQueue
+- **Attributes**: `pnr` (PK), `seat_number`
+- **Description**: Queue for processing Reservation Against Cancellation (RAC) tickets that are eligible for promotion to confirmed status.
 
-## Queries Documentation
-
-This section documents the stored procedures, functions, and triggers.
+## Procedures, Functions, and Triggers
 
 ### Procedures
 
 #### QueryPNRStatus
 - **Signature**: `QueryPNRStatus(IN _pnr INT)`
-- **Description**: Retrieves the status of a booking by PNR number, showing customer name, train name, seat details, and booking status.
+- **Description**: Retrieves status information for a specific PNR number, showing customer name, train name, seat details, and booking status.
 
-#### TrainScheduleLookup
-- **Signature**: `TrainScheduleLookup(IN _tid INT)`
-- **Description**: Displays the complete schedule for a specific train, including all origins, destinations, and timing details.
+#### QueryTrainSchedule
+- **Signature**: `QueryTrainSchedule(IN _tid INT)`
+- **Description**: Lists the complete schedule for a specific train, showing all route segments with departure and arrival times.
 
-#### TrainDateQuery
-- **Signature**: `TrainDateQuery(IN train_id INT, IN d DATE)`
-- **Description**: Lists all passengers traveling on a specific train on a given date, useful for generating passenger manifests.
+#### QueryTrainDatePassengers
+- **Signature**: `QueryTrainDatePassengers(IN _tid INT, IN d DATE)`
+- **Description**: Lists all confirmed passengers traveling on a specific train on a given date.
 
 #### QueryRACCustomers
 - **Signature**: `QueryRACCustomers(IN _tid INT)`
-- **Description**: Retrieves all waitlisted (RAC) passengers for a particular train, helping to manage the waiting list.
-
-#### PeriodRevenue
-- **Signature**: `PeriodRevenue(IN s DATE, IN e DATE)`
-- **Description**: Calculates total revenue from ticket bookings over a specified date range for financial reporting.
+- **Description**: Retrieves all waitlisted (RAC) passengers for a specific train.
 
 #### QueryCancellations
 - **Signature**: `QueryCancellations(IN refunded BOOL)`
-- **Description**: Retrieves cancellation records filtered by refund status, supporting refund processing workflows.
+- **Description**: Lists all cancellation records filtered by refund status (refunded or pending).
 
-#### GenItemizedBill
-- **Signature**: `GenItemizedBill(IN _cid INT, IN _rid INT, IN _seat_class VARCHAR(40))`
-- **Description**: Generates a detailed bill for a ticket including base price and applicable discounts based on seat class and concession status.
-
-#### FindDirectRoutes
-- **Signature**: `FindDirectRoutes(IN city1 VARCHAR(40), IN city2 VARCHAR(40))`
-- **Description**: Lists all direct train routes between two specified cities to assist with travel planning.
+#### QueryItemizedBill
+- **Signature**: `QueryItemizedBill(IN _cid INT, IN _rid INT, IN _seat_class VARCHAR(40))`
+- **Description**: Generates a detailed bill for a ticket showing base price and all applicable discounts based on concession class and seat class.
 
 #### CreateBooking
 - **Signature**: `CreateBooking(IN _cid INT, IN _pid VARCHAR(40), IN _ptype VARCHAR(40), IN _amount INT, IN _btype VARCHAR(40), IN _seat_class VARCHAR(40), IN _seat_number VARCHAR(40))`
-- **Description**: Creates a new booking record with payment information and returns the generated PNR number.
+- **Description**: Creates a new booking record and associated payment entry, returning the generated PNR.
 
 #### InsertBookingRoute
 - **Signature**: `InsertBookingRoute(IN _pnr INT, IN _rid INT)`
-- **Description**: Associates a booking with a specific route, supporting multi-leg journeys.
+- **Description**: Associates a booking with a specific route by adding an entry to the BookingsRoutes table.
 
 #### InsertTrain
 - **Signature**: `InsertTrain(IN _tname VARCHAR(40), IN _first_class INT, IN _second_class INT)`
-- **Description**: Adds a new train to the system with name and seat capacity information for different classes.
-
-#### InsertCustomer
-- **Signature**: `InsertCustomer(IN _cname VARCHAR(40), IN _concession_class VARCHAR(40), IN _age INT)`
-- **Description**: Registers a new customer with name, age, and concession eligibility details.
+- **Description**: Adds a new train to the system with the specified name and seating capacity by class.
 
 #### InsertRoute
 - **Signature**: `InsertRoute(IN _tid INT, IN _origin VARCHAR(40), IN _dest VARCHAR(40), IN _departure DATETIME, IN _arrival DATETIME, IN _base_price INT)`
-- **Description**: Creates a new route entry with train ID, location information, timing, and base pricing details.
+- **Description**: Creates a new route entry for a specific train with origin, destination, schedule times, and pricing information.
+
+#### InsertCustomer
+- **Signature**: `InsertCustomer(IN _cname VARCHAR(40), IN _concession_class VARCHAR(40), IN _age INT)`
+- **Description**: Registers a new customer in the system with their name, age, and concession eligibility details.
 
 ### Functions
 
-#### AvailableSeatQuery
-- **Signature**: `AvailableSeatQuery(routeid INT, seat_num INT)`
-- **Description**: Checks if a specific seat is available on a given route, returning 1 if available, 0 if occupied.
+#### GetRouteSeatAvailability
+- **Signature**: `GetRouteSeatAvailability(_rid INT, _seat_number INT) RETURNS INT`
+- **Description**: Checks if a specific seat is available on a given route, returning 1 if available and 0 if occupied.
 
-#### GetTrainCancelTotalRefund
-- **Signature**: `GetTrainCancelTotalRefund(_tid INT)`
-- **Description**: Calculates the total refund amount required when cancelling an entire train service.
+#### GetTrainCancellationTotalRefund
+- **Signature**: `GetTrainCancellationTotalRefund(_tid INT) RETURNS INT`
+- **Description**: Calculates the total refund amount required if a specific train is cancelled.
 
-#### BusiestRoute
-- **Signature**: `BusiestRoute()`
-- **Description**: Identifies the route with the highest number of booked passengers, useful for capacity planning.
+#### GetPeriodRevenue
+- **Signature**: `GetPeriodRevenue(s DATE, e DATE) RETURNS INT`
+- **Description**: Calculates total revenue generated from ticket bookings over a specified date range.
 
-#### GetClassNumAvailableSeats
-- **Signature**: `GetClassNumAvailableSeats(_rid INT, _seat_class VARCHAR(40))`
-- **Description**: Returns the number of available seats for a specific class on a given route.
+#### GetBusiestRoute
+- **Signature**: `GetBusiestRoute() RETURNS INT`
+- **Description**: Identifies the route with the highest number of confirmed passengers based on booking counts.
+
+#### GetRouteClassNumAvailableSeats
+- **Signature**: `GetRouteClassNumAvailableSeats(_rid INT, _seat_class VARCHAR(40)) RETURNS INT`
+- **Description**: Calculates the number of available seats for a specified route and seat class by comparing capacity with current bookings.
 
 ### Triggers
 
 #### AfterBookingsDelete
-- **Description**: Activates when bookings are deleted, moving them to the Cancellations table and handling RAC promotions.
-- **Functionality**: Manages refund eligibility based on cancellation timing and promotes waitlisted tickets when seats become available.
+- **Triggered**: After `DELETE` operation on Bookings table
+- **Description**: Manages the booking cancellation process by recording cancellation details, determining refund eligibility, and processing RAC ticket promotions when seats become available.
 
 ## Normalization
-
-This section evaluates the normalization levels of each table in the database schema.
-
-## Normalization Analysis by Table
 
 ### Trains
 - **1NF**: ✅ All attributes are atomic and table has a primary key (`tid`).

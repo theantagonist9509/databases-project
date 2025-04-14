@@ -31,9 +31,9 @@ END$$
 DELIMITER ;
 
 -- Train schedule lookup for a given train
-DROP PROCEDURE IF EXISTS TrainScheduleLookup;
+DROP PROCEDURE IF EXISTS QueryTrainSchedule;
 DELIMITER $$
-CREATE PROCEDURE TrainScheduleLookup(IN _tid INT)
+CREATE PROCEDURE QueryTrainSchedule(IN _tid INT)
 BEGIN
     SELECT tname as train_name, origin, dest, departure, arrival
     FROM Routes
@@ -42,10 +42,10 @@ BEGIN
 END$$
 DELIMITER ;
 
--- Available seats query for a specific train, date and class
-DROP FUNCTION IF EXISTS AvailableSeatQuery;
+-- Available seats query for a specific route and seat number
+DROP FUNCTION IF EXISTS GetRouteSeatAvailability;
 DELIMITER $$
-CREATE FUNCTION AvailableSeatQuery(routeid INT, seat_num INT)
+CREATE FUNCTION GetRouteSeatAvailability(_rid INT, _seat_number INT)
 RETURNS INT
 DETERMINISTIC
 BEGIN
@@ -56,7 +56,8 @@ BEGIN
         FROM Bookings
         NATURAL JOIN BookingsRoutes
         NATURAL JOIN Routes
-        WHERE rid = routeid AND seat_number = seat_num
+        WHERE rid = _rid
+        AND seat_number = _seat_number
     ) THEN
         SET ret = 0;
     END IF;
@@ -66,16 +67,16 @@ END$$
 DELIMITER ;
 
 -- List all passengers traveling on a specific train on a given date
-DROP PROCEDURE IF EXISTS TrainDateQuery;
+DROP PROCEDURE IF EXISTS QueryTrainDatePassengers;
 DELIMITER $$
-CREATE PROCEDURE TrainDateQuery(IN train_id INT, IN d DATE)
+CREATE PROCEDURE QueryTrainDatePassengers(IN _tid INT, IN d DATE)
 BEGIN
     SELECT Customers.*
     FROM Customers
     NATURAL JOIN Bookings
     NATURAL JOIN BookingsRoutes
     NATURAL JOIN Routes
-    WHERE tid = train_id
+    WHERE tid = _tid
     AND DATE(departure) = d
     AND btype = 'normal';
 END$$
@@ -97,9 +98,9 @@ END$$
 DELIMITER ;
 
 -- Find total amount that needs to be refunded for cancelling a train
-DROP FUNCTION IF EXISTS GetTrainCancelTotalRefund;
+DROP FUNCTION IF EXISTS GetTrainCancellationTotalRefund;
 DELIMITER $$
-CREATE FUNCTION GetTrainCancelTotalRefund(_tid INT)
+CREATE FUNCTION GetTrainCancellationTotalRefund(_tid INT)
 RETURNS INT
 DETERMINISTIC
 BEGIN
@@ -119,13 +120,19 @@ END $$
 DELIMITER ;
 
 -- Total revenue generated from ticket bookings over a specified period (excluding RAC bookings)
-DROP PROCEDURE IF EXISTS PeriodRevenue;
+DROP FUNCTION IF EXISTS GetPeriodRevenue;
 DELIMITER $$
-CREATE PROCEDURE PeriodRevenue(IN s DATE, IN e DATE)
+CREATE FUNCTION GetPeriodRevenue(s DATE, e DATE)
+RETURNS INT
+DETERMINISTIC
 BEGIN
-    SELECT IFNULL(SUM(amount), 0) AS revenue
+    DECLARE revenue INT;
+
+    SELECT SUM(amount) INTO revenue
     FROM Payments
     WHERE ptime BETWEEN s AND e;
+
+    RETURN IFNULL(revenue, 0);
 END$$
 DELIMITER ;
 
@@ -138,10 +145,10 @@ BEGIN
 END $$
 DELIMITER ;
 
--- Find Busiest Route based on passenger count excluding RAC
-DROP FUNCTION IF EXISTS BusiestRoute;
+-- Find Busiest Route based on passenger count
+DROP FUNCTION IF EXISTS GetBusiestRoute;
 DELIMITER $$
-CREATE FUNCTION BusiestRoute()
+CREATE FUNCTION GetBusiestRoute()
 RETURNS INT
 DETERMINISTIC
 BEGIN
@@ -151,16 +158,19 @@ BEGIN
     FROM Routes
     NATURAL JOIN BookingsRoutes
     NATURAL JOIN Bookings
-    WHERE btype = 'normal' GROUP BY rid ORDER BY COUNT(pnr) DESC LIMIT 1;
+    WHERE btype = 'normal'
+    GROUP BY rid
+    ORDER BY COUNT(pnr)
+    DESC LIMIT 1;
 
     RETURN ret;
 END $$
 DELIMITER ;
 
 -- Generate an itemized bill for a ticket including all charges
-DROP PROCEDURE IF EXISTS GenItemizedBill;
+DROP PROCEDURE IF EXISTS QueryItemizedBill;
 DELIMITER $$
-CREATE PROCEDURE GenItemizedBill(IN _cid INT, IN _rid INT, IN _seat_class VARCHAR(40))
+CREATE PROCEDURE QueryItemizedBill(IN _cid INT, IN _rid INT, IN _seat_class VARCHAR(40))
 BEGIN
     DECLARE _concession_class VARCHAR(40);
     DECLARE _origin VARCHAR(40);
@@ -202,19 +212,10 @@ DELIMITER ;
 
 
 
--- Show all direct routes from city1 to city2
-DROP PROCEDURE IF EXISTS FindDirectRoutes;
-DELIMITER $$
-CREATE PROCEDURE FindDirectRoutes(IN city1 varchar(40), IN city2 varchar(40))
-BEGIN
-    SELECT * FROM Routes WHERE origin = city1 AND dest = city2;
-END$$
-DELIMITER ;
-
 -- Check seat availability based on class
-DROP FUNCTION IF EXISTS GetClassNumAvailableSeats;
+DROP FUNCTION IF EXISTS GetRouteClassNumAvailableSeats;
 DELIMITER $$
-CREATE FUNCTION GetClassNumAvailableSeats(_rid INT, _seat_class VARCHAR(40))
+CREATE FUNCTION GetRouteClassNumAvailableSeats(_rid INT, _seat_class VARCHAR(40))
 RETURNS INT
 DETERMINISTIC
 BEGIN
@@ -299,7 +300,7 @@ BEGIN
             END IF;
 
             IF (
-                SELECT MIN(GetClassNumAvailableSeats(rid, OLD.seat_class))
+                SELECT MIN(GetRouteClassNumAvailableSeats(rid, OLD.seat_class))
                 FROM BookingsRoutes
                 WHERE pnr = _pnr
             ) > 0 THEN
@@ -375,15 +376,6 @@ CREATE PROCEDURE InsertTrain(
 END$$
 DELIMITER ;
 
--- Insert into Customers
-DROP PROCEDURE IF EXISTS InsertCustomer;
-DELIMITER $$
-CREATE PROCEDURE InsertCustomer(IN _cname varchar(40), IN _concession_class varchar(40), IN _age INT)
-BEGIN
-    INSERT INTO Customers (cname, concession_class, age) VALUES (_cname, _concession_class, _age);
-END$$
-DELIMITER ;
-
 -- Insert into Routes
 DROP PROCEDURE IF EXISTS InsertRoute;
 DELIMITER $$
@@ -405,5 +397,14 @@ CREATE PROCEDURE InsertRoute(
         _departure, _arrival,
         _base_price
     );
+END$$
+DELIMITER ;
+
+-- Insert into Customers
+DROP PROCEDURE IF EXISTS InsertCustomer;
+DELIMITER $$
+CREATE PROCEDURE InsertCustomer(IN _cname varchar(40), IN _concession_class varchar(40), IN _age INT)
+BEGIN
+    INSERT INTO Customers (cname, concession_class, age) VALUES (_cname, _concession_class, _age);
 END$$
 DELIMITER ;

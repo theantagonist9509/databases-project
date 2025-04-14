@@ -114,7 +114,7 @@ def createSeatMatrix(tid,start,end):
 
     for i in range(len(seats)):
         for route in routes:
-            cursor.execute("SELECT AvailableSeatQuery(%s, %s)", (route, seats[i]))
+            cursor.execute("SELECT GetRouteSeatAvailability(%s, %s)", (route, seats[i]))
             result = cursor.fetchone()
             if result:
                 available[i] = available[i] and result[0]
@@ -223,7 +223,7 @@ def submitPath():
 
             available = 1
             for route in train_data[x.tid]["routes"][start:stop]:
-                cursor.execute("SELECT AvailableSeatQuery(%s, %s)", (route, seatnum))
+                cursor.execute("SELECT GetRouteSeatAvailability(%s, %s)", (route, seatnum))
                 result = cursor.fetchone()
 
                 print(result)
@@ -263,7 +263,7 @@ def submitPath():
     bill = []
     for tid,data in rids.items():
         for route in data["routes"]:
-            cursor.execute("CALL GenItemizedBill(%s,%s,%s)",(customer_id,route,data["seatclass"]))
+            cursor.execute("CALL QueryItemizedBill(%s,%s,%s)",(customer_id,route,data["seatclass"]))
             origin,destination,seat_class,concession_class,base_price,seat_class_discount,concession_class_discount,final_price = cursor.fetchone()
             while cursor.nextset():
                 pass

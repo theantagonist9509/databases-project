@@ -3,28 +3,30 @@ DROP PROCEDURE IF EXISTS QueryPNRStatus;
 DELIMITER $$
 CREATE PROCEDURE QueryPNRStatus(IN _pnr INT)
 BEGIN
-    DECLARE _cid INT;
-    DECLARE _tid INT;
+    DECLARE _cname VARCHAR(40);
+    DECLARE _tname VARCHAR(40);
 
-    SELECT cid INTO _cid
+    SELECT cname INTO _cname
     FROM Bookings
     NATURAL JOIN Customers
     WHERE pnr = _pnr;
 
-    SELECT tid INTO _tid
+    SELECT tname INTO _tname
     FROM Bookings
     NATURAL JOIN BookingsRoutes
     NATURAL JOIN Routes
     NATURAL JOIN Trains
-    WHERE pnr = _pnr;
+    WHERE pnr = _pnr LIMIT 1;
 
     SELECT
     pnr,
-    _cname AS cname,
-    _tid as train,
+    _cname AS customer,
+    _tname AS train,
     seat_class,
     seat_number,
-    IF(btype = 'normal', 'booked', 'waitlisted') AS status;
+    IF(btype = 'normal', 'booked', 'waitlisted') AS status
+    FROM Bookings
+    WHERE pnr = _pnr;
 END$$
 DELIMITER ;
 
@@ -33,7 +35,10 @@ DROP PROCEDURE IF EXISTS TrainScheduleLookup;
 DELIMITER $$
 CREATE PROCEDURE TrainScheduleLookup(IN _tid INT)
 BEGIN
-    SELECT * FROM Routes WHERE tid = _tid;
+    SELECT tname as train_name, origin, dest, departure, arrival
+    FROM Routes
+    NATURAL JOIN Trains
+    WHERE tid = _tid;
 END$$
 DELIMITER ;
 
@@ -114,14 +119,13 @@ END $$
 DELIMITER ;
 
 -- Total revenue generated from ticket bookings over a specified period (excluding RAC bookings)
-DROP PROCEDURE IF EXISTS RevenuePeriod;
+DROP PROCEDURE IF EXISTS PeriodRevenue;
 DELIMITER $$
-CREATE PROCEDURE RevenuePeriod(IN s DATE, IN e DATE)
+CREATE PROCEDURE PeriodRevenue(IN s DATE, IN e DATE)
 BEGIN
-    SELECT IFNULL(SUM(amount),0) AS earning
-    FROM Bookings NATURAL JOIN Payments
-    WHERE time_of_booking BETWEEN s AND e
-    AND btype = 'normal';
+    SELECT IFNULL(SUM(amount), 0) AS revenue
+    FROM Payments
+    WHERE ptime BETWEEN s AND e;
 END$$
 DELIMITER ;
 
@@ -142,10 +146,13 @@ RETURNS INT
 DETERMINISTIC
 BEGIN
     DECLARE ret INT;
-    select rid into ret from
-    Routes NATURAL JOIN
-    BookingsRoutes NATURAL JOIN Bookings
-    where btype = 'normal' GROUP BY rid ORDER BY COUNT(pnr) DESC LIMIT 1;
+
+    SELECT rid INTO ret
+    FROM Routes
+    NATURAL JOIN BookingsRoutes
+    NATURAL JOIN Bookings
+    WHERE btype = 'normal' GROUP BY rid ORDER BY COUNT(pnr) DESC LIMIT 1;
+
     RETURN ret;
 END $$
 DELIMITER ;
@@ -237,12 +244,13 @@ BEGIN
 END$$
 DELIMITER ;
 
--- A trigger: bookings can be cancelled by simply deleting them from the table
-DROP TRIGGER IF EXISTS BeforeBookingsDelete;
+-- A trigger such that bookings can be cancelled by simply deleting them from the table
+-- Refunds are associated with a negative entry in the Payments table
+DROP TRIGGER IF EXISTS AfterBookingsDelete;
 DELIMITER $$
-CREATE TRIGGER BeforeBookingsDelete
-BEFORE DELETE ON Bookings
-FOR EACH ROW
+CREATE TRIGGER AfterBookingsDelete
+AFTER DELETE
+ON Bookings FOR EACH ROW
 BEGIN
     DECLARE refund_possible BOOL DEFAULT TRUE;
     DECLARE earliest_departure DATETIME;
@@ -250,13 +258,14 @@ BEGIN
     DECLARE _pnr INT;
 
     DECLARE cur CURSOR FOR
-    SELECT DISTINCT pnr
+    SELECT b.pnr
     FROM Bookings b
     JOIN BookingsRoutes br ON b.pnr = br.pnr
     WHERE b.btype = 'rac'
     AND b.seat_class = OLD.seat_class
     AND br.rid IN (SELECT rid FROM BookingsRoutes WHERE pnr = OLD.pnr)
-    ORDER BY b.time_of_booking;
+    GROUP BY b.pnr
+    ORDER BY MIN(b.time_of_booking);
 
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
 
@@ -272,9 +281,11 @@ BEGIN
         END IF;
     END IF;
 
-    INSERT INTO Cancellations SELECT OLD.*, IF(refund_possible, NULL, 'N/A');
-
-    DELETE FROM BookingsRoutes WHERE pnr = OLD.pnr;
+    INSERT INTO Cancellations
+    VALUES (
+        OLD.pnr, OLD.cid, OLD.pid, OLD.btype, OLD.seat_class, OLD.seat_number, OLD.time_of_booking,
+        IF(refund_possible, NULL, 'N/A')
+    );
 
     -- Check for RAC openings
     IF OLD.btype = 'normal' THEN
@@ -292,7 +303,7 @@ BEGIN
                 FROM BookingsRoutes
                 WHERE pnr = _pnr
             ) > 0 THEN
-                UPDATE Bookings SET btype = 'normal' WHERE pnr = _pnr;
+                INSERT INTO RACPromotionQueue VALUES (_pnr, OLD.seat_number);
             END IF;
         END LOOP rac_loop;
 
@@ -315,14 +326,18 @@ CREATE PROCEDURE CreateBooking(
     IN _seat_class varchar(40),
     IN _seat_number varchar(40)
 ) BEGIN
+    DECLARE _now DATETIME;
+    SET _now = now();
 
-    IF NOT EXISTS(select 1 from Payments where pid = _pid) THEN
-        INSERT INTO Payments VALUES (_pid, _ptype, _amount);
+    IF NOT EXISTS (
+        SELECT 1 FROM Payments WHERE pid = _pid
+    ) THEN
+        INSERT INTO Payments VALUES (_pid, _ptype, _amount, _now);
     END IF;
 
     INSERT INTO
     Bookings    (cid, pid, btype, seat_class, seat_number, time_of_booking)
-    VALUES      (_cid, _pid, _btype, _seat_class, _seat_number, now());
+    VALUES      (_cid, _pid, _btype, _seat_class, _seat_number, _now);
 
     SELECT LAST_INSERT_ID() AS pnr;
 END$$
@@ -343,14 +358,17 @@ DELIMITER ;
 DROP PROCEDURE IF EXISTS InsertTrain;
 DELIMITER $$
 CREATE PROCEDURE InsertTrain(
+    IN _tname VARCHAR(40),
     IN _first_class INT,
     IN _second_class INT
 ) BEGIN
     INSERT INTO
     Trains (
+        tname,
         first_class,
         second_class
     ) VALUES (
+        _tname,
         _first_class,
         _second_class
     );

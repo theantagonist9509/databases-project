@@ -1,5 +1,6 @@
 create table Trains (
     tid int primary key auto_increment,
+    tname VARCHAR(40),
     first_class int,
     second_class int
 );
@@ -11,23 +12,22 @@ create table Routes (
     dest varchar(40),
     departure datetime,
     arrival datetime,
+    base_price int,
     foreign key (tid) references Trains(tid)
 );
-ALTER TABLE ROUTES ADD base_price INT;
 
 create table Customers (
     cid int primary key auto_increment,
     cname varchar(40),
-    consetion_class varchar(40),
+    concession_class varchar(40),
     age int
 );
-ALTER TABLE Customers RENAME COLUMN consetion_class TO concession_class;
 
--- TODO add payment time to this itself, since the bookings table will be cleansed of rows of past routes
 create table Payments (
     pid varchar(40) primary key,
     ptype varchar(40),
-    amount int
+    amount int,
+    ptime datetime
 );
 
 create table Bookings (
@@ -52,7 +52,9 @@ create table BookingsRoutes (
     rid int,
     foreign key (rid) references Routes(rid)
 );
-CREATE INDEX idx_bookingsroutes_pnr_rid ON BookingsRoutes(pnr, rid);
+
+-- Index for a common join operation
+create index idx_bookingsroutes_pnr_rid on BookingsRoutes(pnr, rid);
 
 create table Cancellations like Bookings;
 
@@ -61,3 +63,9 @@ alter table Cancellations modify pnr varchar(40) not null;
 
 -- Identifier for the refund transaction; NULL -> Not yet refunded
 alter table Cancellations add column refund_id varchar(40);
+
+-- To circumvent same-table update restriction of triggers
+create table RACPromotionQueue (
+    pnr int primary key,
+    seat_number int
+);

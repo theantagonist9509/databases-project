@@ -1,12 +1,43 @@
--- Train Schedule Lookup
+-- PNR status tracking for a given ticket
+DROP PROCEDURE IF EXISTS QueryPNRStatus;
 DELIMITER $$
-CREATE PROCEDURE TrainScheduleLookup(IN trainid INT)
+CREATE PROCEDURE QueryPNRStatus(IN _pnr INT)
 BEGIN
-    select * from Routes where tid = trainid;
+    DECLARE _cid INT;
+    DECLARE _tid INT;
+
+    SELECT cid INTO _cid
+    FROM Bookings
+    NATURAL JOIN Customers
+    WHERE pnr = _pnr;
+
+    SELECT tid INTO _tid
+    FROM Bookings
+    NATURAL JOIN BookingsRoutes
+    NATURAL JOIN Routes
+    NATURAL JOIN Trains
+    WHERE pnr = _pnr;
+
+    SELECT
+    pnr,
+    _cname AS cname,
+    _tid as train,
+    seat_class,
+    seat_number,
+    IF(btype = 'normal', 'booked', 'waitlisted') AS status;
 END$$
 DELIMITER ;
 
--- Check seat availability
+-- Train schedule lookup for a given train
+DROP PROCEDURE IF EXISTS TrainScheduleLookup;
+DELIMITER $$
+CREATE PROCEDURE TrainScheduleLookup(IN _tid INT)
+BEGIN
+    SELECT * FROM Routes WHERE tid = _tid;
+END$$
+DELIMITER ;
+
+-- Available seats query for a specific train, date and class
 DROP FUNCTION IF EXISTS AvailableSeatQuery;
 DELIMITER $$
 CREATE FUNCTION AvailableSeatQuery(routeid INT, seat_num INT)
@@ -24,44 +55,10 @@ BEGIN
     ) THEN
         SET ret = 0;
     END IF;
-    
+
     RETURN ret;
 END$$
 DELIMITER ;
-
--- Check seat availability based on class
-DROP FUNCTION IF EXISTS GetClassNumAvailableSeats;
-DELIMITER $$
-CREATE FUNCTION GetClassNumAvailableSeats(_rid INT, _seat_class VARCHAR(40))
-RETURNS INT
-DETERMINISTIC
-BEGIN
-    DECLARE _first_class INT;
-    DECLARE _second_class INT;
-
-    DECLARE num_taken INT;
-
-    SELECT first_class, second_class
-    INTO _first_class, _second_class
-    FROM Routes
-    NATURAL JOIN Trains
-    WHERE rid = _rid;
-
-    SELECT COUNT(*) INTO num_taken
-    FROM Bookings
-    NATURAL JOIN BookingsRoutes
-    WHERE rid = _rid
-    AND btype = 'normal'
-    AND seat_class = _seat_class;
-    
-    RETURN CASE _seat_class
-        WHEN 'first_class' THEN _first_class - num_taken
-        WHEN 'second_class' THEN _second_class - num_taken
-        ELSE 0
-    END;
-END$$
-DELIMITER ;
-
 
 -- List all passengers traveling on a specific train on a given date
 DROP PROCEDURE IF EXISTS TrainDateQuery;
@@ -76,43 +73,6 @@ BEGIN
     WHERE tid = train_id
     AND DATE(departure) = d
     AND btype = 'normal';
-END$$
-DELIMITER ;
-
--- Total revenue generated from ticket bookings over a specified period (excluding RAC bookings)
-DROP PROCEDURE IF EXISTS RevenuePeriod;
-DELIMITER $$
-CREATE PROCEDURE RevenuePeriod(IN s DATE, IN e DATE)
-BEGIN
-    SELECT IFNULL(SUM(amount),0) AS earning 
-    FROM Bookings NATURAL JOIN Payments 
-    WHERE time_of_booking BETWEEN s AND e
-    AND btype = 'normal';
-END$$
-DELIMITER ;
-
--- Find Busiest Route based on passenger count excluding RAC
-DROP FUNCTION IF EXISTS BusiestRoute;
-DELIMITER $$
-CREATE FUNCTION BusiestRoute()
-RETURNS INT
-DETERMINISTIC
-BEGIN
-    DECLARE ret INT;
-    select rid into ret from 
-    Routes NATURAL JOIN 
-    BookingsRoutes NATURAL JOIN Bookings 
-    where btype = 'normal' GROUP BY rid ORDER BY COUNT(pnr) DESC LIMIT 1;
-    RETURN ret;
-END $$
-DELIMITER ;
-
--- Show all direct routes from city1 to city2
-DROP PROCEDURE IF EXISTS FindDirectRoutes;
-DELIMITER $$
-CREATE PROCEDURE FindDirectRoutes(IN city1 varchar(40), IN city2 varchar(40))
-BEGIN
-    SELECT * FROM Routes WHERE origin = city1 AND dest = city2;
 END$$
 DELIMITER ;
 
@@ -139,7 +99,7 @@ RETURNS INT
 DETERMINISTIC
 BEGIN
     DECLARE total_refund INT;
-    
+
     SELECT SUM(amount) INTO total_refund
     FROM Payments
     NATURAL JOIN Bookings
@@ -148,9 +108,21 @@ BEGIN
     NATURAL JOIN Trains
     WHERE tid = _tid
     AND btype = 'normal';
-    
+
     RETURN IFNULL(total_refund, 0);
 END $$
+DELIMITER ;
+
+-- Total revenue generated from ticket bookings over a specified period (excluding RAC bookings)
+DROP PROCEDURE IF EXISTS RevenuePeriod;
+DELIMITER $$
+CREATE PROCEDURE RevenuePeriod(IN s DATE, IN e DATE)
+BEGIN
+    SELECT IFNULL(SUM(amount),0) AS earning
+    FROM Bookings NATURAL JOIN Payments
+    WHERE time_of_booking BETWEEN s AND e
+    AND btype = 'normal';
+END$$
 DELIMITER ;
 
 -- Cancellation records with refund status
@@ -159,6 +131,22 @@ DELIMITER $$
 CREATE PROCEDURE QueryCancellations(IN refunded BOOL)
 BEGIN
     SELECT * FROM Cancellations WHERE IF(refunded, refund_id IS NOT NULL, refund_id IS NULL);
+END $$
+DELIMITER ;
+
+-- Find Busiest Route based on passenger count excluding RAC
+DROP FUNCTION IF EXISTS BusiestRoute;
+DELIMITER $$
+CREATE FUNCTION BusiestRoute()
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE ret INT;
+    select rid into ret from
+    Routes NATURAL JOIN
+    BookingsRoutes NATURAL JOIN Bookings
+    where btype = 'normal' GROUP BY rid ORDER BY COUNT(pnr) DESC LIMIT 1;
+    RETURN ret;
 END $$
 DELIMITER ;
 
@@ -204,6 +192,116 @@ BEGIN
         final_price;
 END$$
 DELIMITER ;
+
+
+
+-- Show all direct routes from city1 to city2
+DROP PROCEDURE IF EXISTS FindDirectRoutes;
+DELIMITER $$
+CREATE PROCEDURE FindDirectRoutes(IN city1 varchar(40), IN city2 varchar(40))
+BEGIN
+    SELECT * FROM Routes WHERE origin = city1 AND dest = city2;
+END$$
+DELIMITER ;
+
+-- Check seat availability based on class
+DROP FUNCTION IF EXISTS GetClassNumAvailableSeats;
+DELIMITER $$
+CREATE FUNCTION GetClassNumAvailableSeats(_rid INT, _seat_class VARCHAR(40))
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE _first_class INT;
+    DECLARE _second_class INT;
+
+    DECLARE num_taken INT;
+
+    SELECT first_class, second_class
+    INTO _first_class, _second_class
+    FROM Routes
+    NATURAL JOIN Trains
+    WHERE rid = _rid;
+
+    SELECT COUNT(*) INTO num_taken
+    FROM Bookings
+    NATURAL JOIN BookingsRoutes
+    WHERE rid = _rid
+    AND btype = 'normal'
+    AND seat_class = _seat_class;
+
+    RETURN CASE _seat_class
+        WHEN 'first_class' THEN _first_class - num_taken
+        WHEN 'second_class' THEN _second_class - num_taken
+        ELSE 0
+    END;
+END$$
+DELIMITER ;
+
+-- A trigger: bookings can be cancelled by simply deleting them from the table
+DROP TRIGGER IF EXISTS BeforeBookingsDelete;
+DELIMITER $$
+CREATE TRIGGER BeforeBookingsDelete
+BEFORE DELETE ON Bookings
+FOR EACH ROW
+BEGIN
+    DECLARE refund_possible BOOL DEFAULT TRUE;
+    DECLARE earliest_departure DATETIME;
+    DECLARE done INT DEFAULT 0;
+    DECLARE _pnr INT;
+
+    DECLARE cur CURSOR FOR
+    SELECT DISTINCT pnr
+    FROM Bookings b
+    JOIN BookingsRoutes br ON b.pnr = br.pnr
+    WHERE b.btype = 'rac'
+    AND b.seat_class = OLD.seat_class
+    AND br.rid IN (SELECT rid FROM BookingsRoutes WHERE pnr = OLD.pnr)
+    ORDER BY b.time_of_booking;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+
+    IF OLD.btype = 'normal' THEN
+        SELECT MIN(r.departure)
+        INTO earliest_departure
+        FROM BookingsRoutes br
+        JOIN Routes r ON br.rid = r.rid
+        WHERE br.pnr = OLD.pnr;
+
+        IF TIMESTAMPDIFF(DAY, OLD.time_of_booking, earliest_departure) < 1 THEN
+            SET refund_possible = FALSE;
+        END IF;
+    END IF;
+
+    INSERT INTO Cancellations SELECT OLD.*, IF(refund_possible, NULL, 'N/A');
+
+    DELETE FROM BookingsRoutes WHERE pnr = OLD.pnr;
+
+    -- Check for RAC openings
+    IF OLD.btype = 'normal' THEN
+        OPEN cur;
+
+        rac_loop: LOOP
+            FETCH cur INTO _pnr;
+
+            IF done = 1 THEN
+                LEAVE rac_loop;
+            END IF;
+
+            IF (
+                SELECT MIN(GetClassNumAvailableSeats(rid, OLD.seat_class))
+                FROM BookingsRoutes
+                WHERE pnr = _pnr
+            ) > 0 THEN
+                UPDATE Bookings SET btype = 'normal' WHERE pnr = _pnr;
+            END IF;
+        END LOOP rac_loop;
+
+        CLOSE cur;
+    END IF;
+END$$
+DELIMITER ;
+
+
 
 -- Create a booking
 DROP PROCEDURE IF EXISTS CreateBooking;
@@ -289,69 +387,5 @@ CREATE PROCEDURE InsertRoute(
         _departure, _arrival,
         _base_price
     );
-END$$
-DELIMITER ;
-
--- Bookings can be cancelled by simply deleting them from the table
-DROP TRIGGER IF EXISTS BeforeBookingsDelete;
-DELIMITER $$
-CREATE TRIGGER BeforeBookingsDelete
-BEFORE DELETE ON Bookings
-FOR EACH ROW
-BEGIN
-    DECLARE refund_possible BOOL DEFAULT TRUE;
-    DECLARE earliest_departure DATETIME;
-    DECLARE done INT DEFAULT 0;
-    DECLARE _pnr INT;
-    
-    DECLARE cur CURSOR FOR
-    SELECT DISTINCT pnr
-    FROM Bookings b
-    JOIN BookingsRoutes br ON b.pnr = br.pnr
-    WHERE b.btype = 'rac'
-    AND b.seat_class = OLD.seat_class
-    AND br.rid IN (SELECT rid FROM BookingsRoutes WHERE pnr = OLD.pnr)
-    ORDER BY b.time_of_booking;
-
-    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
-
-    IF OLD.btype = 'normal' THEN
-        SELECT MIN(r.departure)
-        INTO earliest_departure
-        FROM BookingsRoutes br
-        JOIN Routes r ON br.rid = r.rid
-        WHERE br.pnr = OLD.pnr;
-
-        IF TIMESTAMPDIFF(DAY, OLD.time_of_booking, earliest_departure) < 1 THEN
-            SET refund_possible = FALSE;
-        END IF;
-    END IF;
-
-    INSERT INTO Cancellations SELECT OLD.*, IF(refund_possible, NULL, 'N/A');
-
-    DELETE FROM BookingsRoutes WHERE pnr = OLD.pnr;
-
-    -- Check for RAC openings
-    IF OLD.btype = 'normal' THEN
-        OPEN cur;
-        
-        rac_loop: LOOP
-            FETCH cur INTO _pnr;
-            
-            IF done = 1 THEN
-                LEAVE rac_loop;
-            END IF;
-
-            IF (
-                SELECT MIN(GetClassNumAvailableSeats(rid, OLD.seat_class))
-                FROM BookingsRoutes
-                WHERE pnr = _pnr
-            ) > 0 THEN
-                UPDATE Bookings SET btype = 'normal' WHERE pnr = _pnr;
-            END IF;
-        END LOOP rac_loop;
-
-        CLOSE cur;
-    END IF;
 END$$
 DELIMITER ;

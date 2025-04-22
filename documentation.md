@@ -1,4 +1,16 @@
-# Train Reservation System Database Documentation
+# About
+
+[**GitHub Link**](https://github.com/theantagonist9509/databases-project)
+
+## Group Members
+- 2301AI30
+    - Tejas Tanmay Singh
+- 2301AI04
+    - Ayush Bansal
+- 2301CS89
+    - Suvrayan Bandyopadhyay
+
+# Database Documentation
 
 ## ER Diagram
 
@@ -55,7 +67,7 @@
 - **Description**: Lists all confirmed passengers traveling on a specific train on a given date.
 
 #### QueryRACCustomers
-- **Signature**: `QueryRACCustomers(IN _tid INT)`
+- **Signature**: `QueryTrainRACCustomers(IN _tid INT)`
 - **Description**: Retrieves all waitlisted (RAC) passengers for a specific train.
 
 #### QueryCancellations

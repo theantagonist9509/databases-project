@@ -142,7 +142,7 @@ DELIMITER $$
 CREATE PROCEDURE QueryCancellations(IN refunded BOOL)
 BEGIN
     SELECT * FROM Cancellations WHERE IF(refunded, refund_id IS NOT NULL, refund_id IS NULL);
-END $$
+END$$
 DELIMITER ;
 
 -- Find Busiest Route based on passenger count
@@ -164,7 +164,7 @@ BEGIN
     DESC LIMIT 1;
 
     RETURN ret;
-END $$
+END$$
 DELIMITER ;
 
 -- Generate an itemized bill for a ticket including all charges

@@ -70,10 +70,14 @@ add_customer.place(x = 230, y = 50)
 see_trains.place(x = 230, y = 100)
 
 # add customer
+label_name = tk.Label(AddCustomer, text="Customer Name:")
+label_age = tk.Label(AddCustomer, text="Customer Age:")
+label_name.place(x=150, y=100)
+label_age.place(x=150, y=200)
 customer_name = tk.Entry(AddCustomer)
 customer_age = tk.Entry(AddCustomer)
-customer_name.place(x = 270,y = 100)
-customer_age.place(x = 270,y = 200)
+customer_name.place(x=270, y=100)
+customer_age.place(x=270, y=200)
 
 def submitSubway():
     cname = customer_name.get()

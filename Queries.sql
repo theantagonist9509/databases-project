@@ -83,9 +83,9 @@ END$$
 DELIMITER ;
 
 -- Retrieve all waitlisted passengers for a particular train
-DROP PROCEDURE IF EXISTS QueryRACCustomers;
+DROP PROCEDURE IF EXISTS QueryTrainRACCustomers;
 DELIMITER $$
-CREATE PROCEDURE QueryRACCustomers(IN _tid INT)
+CREATE PROCEDURE QueryTrainRACCustomers(IN _tid INT)
 BEGIN
     SELECT Customers.*
     FROM Bookings
@@ -116,7 +116,7 @@ BEGIN
     AND btype = 'normal';
 
     RETURN IFNULL(total_refund, 0);
-END $$
+END$$
 DELIMITER ;
 
 -- Total revenue generated from ticket bookings over a specified period (excluding RAC bookings)
